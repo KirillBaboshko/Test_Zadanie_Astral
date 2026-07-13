@@ -1,26 +1,20 @@
-﻿using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using Test_Zadanie_Astral.Infrastructure;
-using Test_Zadanie_Astral.Models;
+﻿using System.Text;
+using Test_Zadanie_Astral.Application;
 using static System.Console;
 
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-WriteLine("=== P2P Чат (UDP) ===");
+WriteLine("=== UDP Чат (Клиент-Сервер) ===");
 WriteLine();
-ChatUser user = new ChatUser();
-if (!user.TryReadListenPort("Порт для прослушивания: "))
-    return;
-if (!user.TryParseRemoteAddress())
-    return;
-if (!user.TryReadName("Ваше имя: "))
-    return;
-IPEndPoint remoteEndPoint = new IPEndPoint(user.RemoteAddress, user.RemotePort);
 
-using UdpClient udp = new UdpClient(user.ListenPort);
-using CancellationTokenSource cts = new CancellationTokenSource();
+using CancellationTokenSource cts = new();
 
-await App.Run(user, remoteEndPoint, udp, cts);
 
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
+
+await Application.RunAsync(cts);
