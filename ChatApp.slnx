@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Client/">
+    <Project Path="src/Client/ChatApp.Client.Application/ChatApp.Client.Application.csproj" />
+    <Project Path="src/Client/ChatApp.Client.Console/ChatApp.Client.Console.csproj" />
+    <Project Path="src/Client/ChatApp.Client.Infrastructure/ChatApp.Client.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Server/">
+    <Project Path="src/Server/ChatApp.Server.Api/ChatApp.Server.Api.csproj" />
+    <Project Path="src/Server/ChatApp.Server.Application/ChatApp.Server.Application.csproj" />
+    <Project Path="src/Server/ChatApp.Server.Domain/ChatApp.Server.Domain.csproj" />
+    <Project Path="src/Server/ChatApp.Server.Infrastructure/ChatApp.Server.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/ChatApp.Contracts/ChatApp.Contracts.csproj" />
+  </Folder>
+</Solution>
