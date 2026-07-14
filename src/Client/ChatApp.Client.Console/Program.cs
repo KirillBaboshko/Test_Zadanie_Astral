@@ -23,7 +23,7 @@ if (String.IsNullOrWhiteSpace(userName))
 
 WriteLine();
 WriteLine($"Подключение к серверу {serverUrl}...");
-WriteLine("Команды: /exit - выход");
+WriteLine("Команды: /exit - выход, /about-user - сообщения по имени отправителя");
 WriteLine();
 
 using var apiClient = new HttpChatApiClient(serverUrl);
@@ -61,6 +61,16 @@ try
         {
             cts.Cancel();
             break;
+        }
+        if (input.Equals("/about-user", StringComparison.OrdinalIgnoreCase))
+        {
+            Write("Введите имя пользователя: ");
+            String? targetUserName = ReadLine();
+            if (!String.IsNullOrWhiteSpace(targetUserName))
+            {
+                pollingService.GetMessagesByUserName(targetUserName, cts.Token).Wait();
+            }
+            continue;
         }
 
         if (String.IsNullOrWhiteSpace(input))

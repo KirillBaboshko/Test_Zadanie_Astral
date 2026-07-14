@@ -4,7 +4,7 @@ public sealed class ChatPollingService
 {
     private readonly IChatApiClient _apiClient;
     private DateTime _lastMessageTime = DateTime.UtcNow;
-   
+    const Int32 Limit = 50;
 
     public ChatPollingService(IChatApiClient apiClient)
     {
@@ -22,7 +22,7 @@ public sealed class ChatPollingService
             {
                 await Task.Delay(PollingInterval, cancellationToken);
 
-                var response = await _apiClient.GetMessagesAsync(_lastMessageTime, 50, cancellationToken);
+                var response = await _apiClient.GetMessagesAsync(_lastMessageTime, Limit, cancellationToken);
 
                 if (response?.Messages != null && response.Messages.Count > 0)
                 {
@@ -54,6 +54,18 @@ public sealed class ChatPollingService
     {
         if (timestamp > _lastMessageTime)
             _lastMessageTime = timestamp;
+    }
+    public async Task GetMessagesByUserName(String targetUserName, CancellationToken cancellationToken)
+    { 
+        var response = await _apiClient.GetMessagesForNameAsync(Limit, targetUserName, cancellationToken);
+
+        if (response?.Messages != null && response.Messages.Count > 0)
+        {
+            foreach (var message in response.Messages)
+            {
+                MessageReceived?.Invoke(this, new MessageReceivedEventArgs(message));
+            }
+        }
     }
 }
 

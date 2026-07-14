@@ -33,4 +33,24 @@ public sealed class GetMessagesUseCase
             TotalCount = totalCount
         };
     }
+    public async Task<GetMessagesResponse> ExecuteForNameAsync(
+        Int32 limit = 100,
+        String senderName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var messages = await _repository.GetForNameAsync(limit, senderName, cancellationToken);
+        var totalCount = await _repository.GetTotalCountAsync(cancellationToken);
+
+        return new GetMessagesResponse
+        {
+            Messages = messages.Select(m => new ChatMessageDto
+            {
+                Id = m.Id,
+                SenderName = m.SenderName,
+                Content = m.Content,
+                Timestamp = m.Timestamp
+            }).ToList(),
+            TotalCount = totalCount
+        };
+    }
 }

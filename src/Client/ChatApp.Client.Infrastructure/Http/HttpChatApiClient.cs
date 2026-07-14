@@ -53,6 +53,23 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
             return null;
         }
     }
+    public async Task<GetMessagesResponse?> GetMessagesForNameAsync(Int32 limit = 100, String? senderName = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var queryParams = $"?limit={limit}";
+            if (!String.IsNullOrEmpty(senderName))
+                queryParams += $"&senderName={Uri.EscapeDataString(senderName)}";
+
+            var response = await _httpClient.GetAsync($"api/chat/messages-for-name{queryParams}", cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<GetMessagesResponse>(cancellationToken: cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
 
     public void Dispose()
     {

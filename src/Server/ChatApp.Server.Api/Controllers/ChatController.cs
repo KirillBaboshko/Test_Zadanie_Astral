@@ -52,4 +52,20 @@ public class ChatController : ControllerBase
 
         return Ok(response);
     }
+    [HttpGet("messages-for-name")]
+    [ProducesResponseType(typeof(GetMessagesResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<GetMessagesResponse>> GetMessagesForName(
+        [FromQuery] Int32 limit = 100,
+        [FromQuery] String? senderName = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit < 1 || limit > 1000)
+            return BadRequest("Limit должен быть от 1 до 1000");
+        if(String.IsNullOrEmpty(senderName))
+            return BadRequest("Имя отправителя не может быть пустым");
+
+        var response = await _getMessagesUseCase.ExecuteForNameAsync(limit, senderName, cancellationToken);
+
+        return Ok(response);
+    }
 }
