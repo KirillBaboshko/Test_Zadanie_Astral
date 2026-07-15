@@ -2,20 +2,14 @@ using ChatApp.Server.Domain.Repositories;
 
 namespace ChatApp.Server.Application.UseCases.GetUserInfo;
 
-/// <summary>
-/// Use case для получения детальной информации о пользователе
-/// </summary>
+
 public sealed class GetUserInfoUseCase
 {
     private readonly IUserRepository _userRepository;
-    private readonly IMessageRepository _messageRepository;
 
-    public GetUserInfoUseCase(
-        IUserRepository userRepository,
-        IMessageRepository messageRepository)
+    public GetUserInfoUseCase(IUserRepository userRepository)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
-        _messageRepository = messageRepository ?? throw new ArgumentNullException(nameof(messageRepository));
     }
 
     /// <summary>
@@ -23,12 +17,10 @@ public sealed class GetUserInfoUseCase
     /// </summary>
     public async Task<UserInfoDto?> ExecuteAsync(String username, CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByUsernameAsync(username, cancellationToken);
+        var user = await _userRepository.GetByUsernameWithMessagesAsync(username, cancellationToken);
         
         if (user == null)
             return null;
-
-        var messageCount = await _messageRepository.GetCountForUserIdAsync(user.Id, cancellationToken);
 
         return new UserInfoDto
         {
@@ -36,7 +28,7 @@ public sealed class GetUserInfoUseCase
             Username = user.Username,
             CreatedAt = user.CreatedAt,
             LastSeenAt = user.LastSeenAt,
-            MessageCount = messageCount
+            MessageCount = user.GetMessageCount()
         };
     }
 }

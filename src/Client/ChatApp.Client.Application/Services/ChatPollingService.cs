@@ -1,8 +1,6 @@
 namespace ChatApp.Client.Application.Services;
 
-/// <summary>
-/// Сервис для периодического опроса сервера на наличие новых сообщений
-/// </summary>
+
 public sealed class ChatPollingService
 {
     private readonly IChatApiClient _apiClient;

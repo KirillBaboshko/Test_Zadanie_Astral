@@ -29,12 +29,6 @@ public sealed class ChatMessageConfiguration : IEntityTypeConfiguration<ChatMess
             .HasColumnName("timestamp")
             .IsRequired();
 
-        // Связь с User
-        builder.HasOne(m => m.User)
-            .WithMany(u => u.Messages)
-            .HasForeignKey(m => m.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasIndex(m => m.Timestamp)
             .HasDatabaseName("ix_messages_timestamp");
 

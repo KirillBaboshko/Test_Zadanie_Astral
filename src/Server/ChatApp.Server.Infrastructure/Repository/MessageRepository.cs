@@ -5,10 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChatApp.Server.Infrastructure.Repository;
 
-/// <summary>
-/// Репозиторий для работы с сообщениями чата в базе данных
-/// </summary>
-public sealed class MessageRepository : IMessageRepository
+internal sealed class MessageRepository : IMessageRepository
 {
     private readonly ChatDbContext _context;
 
@@ -27,20 +24,12 @@ public sealed class MessageRepository : IMessageRepository
     }
 
     /// <summary>
-    /// Сохраняет изменения в базе данных
-    /// </summary>
-    public async Task SaveAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
-    /// <summary>
     /// Получает список сообщений с возможностью фильтрации по времени
     /// </summary>
     public async Task<List<ChatMessage>> GetAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default)
     {
         var query = _context.Messages
-            .Include(m => m.User)
+            .AsNoTracking()
             .AsQueryable();
 
         if (since.HasValue)
@@ -58,7 +47,7 @@ public sealed class MessageRepository : IMessageRepository
     public async Task<List<ChatMessage>> GetForUserIdAsync(Guid userId, Int32 limit = 100, CancellationToken cancellationToken = default)
     {
         return await _context.Messages
-            .Include(m => m.User)
+            .AsNoTracking()
             .Where(m => m.UserId == userId)
             .OrderBy(m => m.Timestamp)
             .Take(limit)

@@ -5,16 +5,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChatApp.Server.Infrastructure.Repository;
 
-/// <summary>
-/// Репозиторий для работы с пользователями в базе данных
-/// </summary>
+
 public sealed class UserRepository : IUserRepository
 {
     private readonly ChatDbContext _context;
+    private readonly MessageRepository _messageRepository;
 
     public UserRepository(ChatDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _messageRepository = new MessageRepository(context);
     }
 
     /// <summary>
@@ -23,6 +23,7 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByUsernameAsync(String username, CancellationToken cancellationToken = default)
     {
         return await _context.Users
+            .AsTracking()
             .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
     }
 
@@ -32,6 +33,29 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Users
+            .AsTracking()
+            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+    }
+
+    /// <summary>
+    /// Находит пользователя по имени вместе с его сообщениями
+    /// </summary>
+    public async Task<User?> GetByUsernameWithMessagesAsync(String username, CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .AsTracking()
+            .Include(u => u.Messages)
+            .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
+    }
+
+    /// <summary>
+    /// Находит пользователя по идентификатору вместе с его сообщениями
+    /// </summary>
+    public async Task<User?> GetByIdWithMessagesAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .AsTracking()
+            .Include(u => u.Messages)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
@@ -42,14 +66,6 @@ public sealed class UserRepository : IUserRepository
     {
         await _context.Users.AddAsync(user, cancellationToken);
         return user;
-    }
-
-    /// <summary>
-    /// Сохраняет изменения в базе данных
-    /// </summary>
-    public async Task SaveAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
@@ -66,6 +82,35 @@ public sealed class UserRepository : IUserRepository
     public async Task<List<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Users
+            .AsNoTracking()
+            .OrderBy(u => u.Username)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Получает все сообщения всех пользователей (делегирует к внутреннему MessageRepository)
+    /// </summary>
+    public async Task<List<ChatMessage>> GetAllMessagesAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default)
+    {
+        return await _messageRepository.GetAsync(since, limit, cancellationToken);
+    }
+
+    /// <summary>
+    /// Получает общее количество сообщений (делегирует к внутреннему MessageRepository)
+    /// </summary>
+    public async Task<Int32> GetTotalMessageCountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _messageRepository.GetTotalCountAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Получает всех пользователей вместе с их сообщениями
+    /// </summary>
+    public async Task<List<User>> GetAllUsersWithMessagesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Include(u => u.Messages)
             .OrderBy(u => u.Username)
             .ToListAsync(cancellationToken);
     }

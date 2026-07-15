@@ -1,23 +1,16 @@
 namespace ChatApp.Server.Domain.Entities;
-
-/// <summary>
-/// Сущность пользователя чата
-/// </summary>
 public sealed class User
 {
+    private readonly List<ChatMessage> _messages = [];
+
     public Guid Id { get; private set; }
     public String Username { get; private set; } = String.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime LastSeenAt { get; private set; }
-
-    // Navigation property
-    public ICollection<ChatMessage> Messages { get; private set; } = new List<ChatMessage>();
+    public IReadOnlyList<ChatMessage> Messages => _messages;
 
     private User() { }
 
-    /// <summary>
-    /// Создаёт нового пользователя
-    /// </summary>
     public User(String username)
     {
         if (String.IsNullOrWhiteSpace(username))
@@ -35,5 +28,40 @@ public sealed class User
     public void UpdateLastSeen()
     {
         LastSeenAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Добавляет новое сообщение к пользователю
+    /// </summary>
+    /// <returns>Добавленное сообщение</returns>
+    public ChatMessage AddMessage(String content)
+    {
+        if (String.IsNullOrWhiteSpace(content))
+            throw new ArgumentException("Содержимое сообщения не может быть пустым", nameof(content));
+
+        var message = new ChatMessage(Id, content);
+        _messages.Add(message);
+        UpdateLastSeen();
+        
+        return message;
+    }
+
+    /// <summary>
+    /// Получает сообщения пользователя с ограничением
+    /// </summary>
+    public IReadOnlyList<ChatMessage> GetMessages(int limit = 100)
+    {
+        return _messages
+            .OrderBy(m => m.Timestamp)
+            .Take(limit)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Получает количество сообщений пользователя
+    /// </summary>
+    public int GetMessageCount()
+    {
+        return _messages.Count;
     }
 }

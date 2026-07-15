@@ -2,9 +2,8 @@ using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUserInfo;
 using ChatApp.Server.Application.UseCases.GetUsers;
 using ChatApp.Server.Application.UseCases.SendMessage;
-using ChatApp.Server.Domain.Repositories;
+using ChatApp.Server.Infrastructure;
 using ChatApp.Server.Infrastructure.Data;
-using ChatApp.Server.Infrastructure.Repository;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,12 +22,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-
-builder.Services.AddDbContextPool<ChatDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-builder.Services.AddScoped<IMessageRepository, MessageRepository>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddValidatorsFromAssemblyContaining<SendMessageUseCase>();
 

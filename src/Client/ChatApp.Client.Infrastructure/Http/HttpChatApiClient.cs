@@ -6,9 +6,7 @@ using ChatApp.Contracts.Responses;
 
 namespace ChatApp.Client.Infrastructure.Http;
 
-/// <summary>
-/// HTTP клиент для взаимодействия с Chat API
-/// </summary>
+
 public sealed class HttpChatApiClient : IChatApiClient, IDisposable
 {
     private readonly HttpClient _httpClient;

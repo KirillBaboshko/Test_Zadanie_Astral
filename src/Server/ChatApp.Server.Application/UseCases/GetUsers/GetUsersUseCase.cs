@@ -2,9 +2,7 @@ using ChatApp.Server.Domain.Repositories;
 
 namespace ChatApp.Server.Application.UseCases.GetUsers;
 
-/// <summary>
-/// Use case для получения списка всех пользователей
-/// </summary>
+
 public sealed class GetUsersUseCase
 {
     private readonly IUserRepository _userRepository;

@@ -4,17 +4,13 @@ using ChatApp.Server.Domain.Repositories;
 
 namespace ChatApp.Server.Application.UseCases.GetMessages;
 
-/// <summary>
-/// Use case для получения сообщений из чата
-/// </summary>
+
 public sealed class GetMessagesUseCase
 {
-    private readonly IMessageRepository _repository;
     private readonly IUserRepository _userRepository;
 
-    public GetMessagesUseCase(IMessageRepository repository, IUserRepository userRepository)
+    public GetMessagesUseCase(IUserRepository userRepository)
     {
-        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
     }
 
@@ -26,18 +22,30 @@ public sealed class GetMessagesUseCase
         Int32 limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var messages = await _repository.GetAsync(since, limit, cancellationToken);
-        var totalCount = await _repository.GetTotalCountAsync(cancellationToken);
+        var users = await _userRepository.GetAllUsersWithMessagesAsync(cancellationToken);
+        var totalCount = await _userRepository.GetTotalMessageCountAsync(cancellationToken);
+
+        var allMessages = users
+            .SelectMany(user => user.Messages.Select(message => new
+            {
+                User = user,
+                Message = message
+            }))
+            .Where(x => !since.HasValue || x.Message.Timestamp >= since.Value)
+            .OrderBy(x => x.Message.Timestamp)
+            .Take(limit)
+            .Select(x => new ChatMessageDto
+            {
+                Id = x.Message.Id,
+                SenderName = x.User.Username,
+                Content = x.Message.Content,
+                Timestamp = x.Message.Timestamp
+            })
+            .ToList();
 
         return new GetMessagesResponse
         {
-            Messages = messages.Select(m => new ChatMessageDto
-            {
-                Id = m.Id,
-                SenderName = m.User.Username,
-                Content = m.Content,
-                Timestamp = m.Timestamp
-            }).ToList(),
+            Messages = allMessages,
             TotalCount = totalCount
         };
     }
@@ -50,15 +58,26 @@ public sealed class GetMessagesUseCase
         Int32 limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var messages = await _repository.GetForUserIdAsync(userId, limit, cancellationToken);
-        var totalCount = await _repository.GetTotalCountAsync(cancellationToken);
+        var user = await _userRepository.GetByIdWithMessagesAsync(userId, cancellationToken);
+        
+        if (user == null)
+        {
+            return new GetMessagesResponse
+            {
+                Messages = new List<ChatMessageDto>(),
+                TotalCount = 0
+            };
+        }
+
+        var messages = user.GetMessages(limit);
+        var totalCount = await _userRepository.GetTotalMessageCountAsync(cancellationToken);
 
         return new GetMessagesResponse
         {
             Messages = messages.Select(m => new ChatMessageDto
             {
                 Id = m.Id,
-                SenderName = m.User.Username,
+                SenderName = user.Username,
                 Content = m.Content,
                 Timestamp = m.Timestamp
             }).ToList(),
@@ -74,11 +93,24 @@ public sealed class GetMessagesUseCase
         Int32 limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByUsernameAsync(username, cancellationToken);
+        var user = await _userRepository.GetByUsernameWithMessagesAsync(username, cancellationToken);
         
         if (user == null)
             return null;
 
-        return await ExecuteForUserIdAsync(user.Id, limit, cancellationToken);
+        var messages = user.GetMessages(limit);
+        var totalCount = await _userRepository.GetTotalMessageCountAsync(cancellationToken);
+
+        return new GetMessagesResponse
+        {
+            Messages = messages.Select(m => new ChatMessageDto
+            {
+                Id = m.Id,
+                SenderName = user.Username,
+                Content = m.Content,
+                Timestamp = m.Timestamp
+            }).ToList(),
+            TotalCount = totalCount
+        };
     }
 }

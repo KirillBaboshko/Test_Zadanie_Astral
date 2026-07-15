@@ -29,7 +29,15 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("last_seen_at")
             .IsRequired();
 
-        // Уникальный индекс на username
+        builder.HasMany<ChatMessage>(u => u.Messages)
+            .WithOne()
+            .HasForeignKey(m => m.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata
+            .FindNavigation(nameof(User.Messages))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasIndex(u => u.Username)
             .IsUnique()
             .HasDatabaseName("ix_users_username");

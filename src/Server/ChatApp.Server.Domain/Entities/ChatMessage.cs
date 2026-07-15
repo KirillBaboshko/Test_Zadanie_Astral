@@ -1,8 +1,5 @@
 namespace ChatApp.Server.Domain.Entities;
 
-/// <summary>
-/// Сущность сообщения в чате
-/// </summary>
 public sealed class ChatMessage
 {
     public Guid Id { get; private set; }
@@ -10,14 +7,8 @@ public sealed class ChatMessage
     public String Content { get; private set; } = String.Empty;
     public DateTime Timestamp { get; private set; }
 
-    // Navigation property
-    public User User { get; private set; } = null!;
-
     private ChatMessage() { } 
 
-    /// <summary>
-    /// Создаёт новое сообщение от пользователя
-    /// </summary>
     public ChatMessage(Guid userId, String content)
     {
         if (userId == Guid.Empty)

@@ -1,27 +1,22 @@
 using ChatApp.Contracts.Messages;
 using ChatApp.Contracts.Requests;
+using ChatApp.Server.Domain.Abstractions;
 using ChatApp.Server.Domain.Entities;
 using ChatApp.Server.Domain.Repositories;
-using ChatApp.Server.FixingChanges;
-
-
 
 namespace ChatApp.Server.Application.UseCases.SendMessage;
 
-/// <summary>
-/// Use case для отправки нового сообщения в чат
-/// </summary>
 public sealed class SendMessageUseCase
 {
-    private readonly IMessageRepository _messageRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SendMessageUseCase(
-        IMessageRepository messageRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IUnitOfWork unitOfWork)
     {
-        _messageRepository = messageRepository ?? throw new ArgumentNullException(nameof(messageRepository));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     }
 
     /// <summary>
@@ -42,16 +37,17 @@ public sealed class SendMessageUseCase
             await _userRepository.UpdateAsync(user, cancellationToken);
         }
 
-        var message = new ChatMessage(user.Id, request.Content);
-        var saved = await _messageRepository.AddAsync(message, cancellationToken);
-        await FixingСhanges.FixChangesAsync(_userRepository, cancellationToken); //Немного криво сейчас реализованно
+        // Добавляем сообщение через агрегат User
+        var message = user.AddMessage(request.Content);
+        
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ChatMessageDto
         {
-            Id = saved.Id,
+            Id = message.Id,
             SenderName = user.Username,
-            Content = saved.Content,
-            Timestamp = saved.Timestamp
+            Content = message.Content,
+            Timestamp = message.Timestamp
         };
     }
 }

@@ -4,11 +4,6 @@ using ChatApp.Contracts.Responses;
 
 namespace ChatApp.Client.Application.Services;
 
-using ChatApp.Contracts.Messages;
-using ChatApp.Contracts.Requests;
-using ChatApp.Contracts.Responses;
-
-namespace ChatApp.Client.Application.Services;
 
 public interface IChatApiClient
 {
