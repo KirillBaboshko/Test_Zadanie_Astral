@@ -6,6 +6,9 @@ using ChatApp.Contracts.Responses;
 
 namespace ChatApp.Client.Infrastructure.Http;
 
+/// <summary>
+/// HTTP клиент для взаимодействия с Chat API
+/// </summary>
 public sealed class HttpChatApiClient : IChatApiClient, IDisposable
 {
     private readonly HttpClient _httpClient;
@@ -22,6 +25,9 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
         };
     }
 
+    /// <summary>
+    /// Отправляет новое сообщение на сервер
+    /// </summary>
     public async Task<ChatMessageDto?> SendMessageAsync(SendMessageRequest request, CancellationToken cancellationToken = default)
     {
         try
@@ -36,6 +42,9 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
         }
     }
 
+    /// <summary>
+    /// Получает список сообщений с возможностью фильтрации по времени
+    /// </summary>
     public async Task<GetMessagesResponse?> GetMessagesAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default)
     {
         try
@@ -53,6 +62,10 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
             return null;
         }
     }
+
+    /// <summary>
+    /// Получает список сообщений конкретного пользователя по имени
+    /// </summary>
     public async Task<GetMessagesResponse?> GetMessagesForNameAsync(Int32 limit = 100, String? senderName = null, CancellationToken cancellationToken = default)
     {
         try

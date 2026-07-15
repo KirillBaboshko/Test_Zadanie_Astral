@@ -1,5 +1,8 @@
 namespace ChatApp.Client.Application.Services;
 
+/// <summary>
+/// Сервис для периодического опроса сервера на наличие новых сообщений
+/// </summary>
 public sealed class ChatPollingService
 {
     private readonly IChatApiClient _apiClient;
@@ -11,8 +14,14 @@ public sealed class ChatPollingService
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
     }
 
+    /// <summary>
+    /// Событие получения нового сообщения
+    /// </summary>
     public event EventHandler<MessageReceivedEventArgs>? MessageReceived;
 
+    /// <summary>
+    /// Запускает циклический опрос сервера для получения новых сообщений
+    /// </summary>
     public async Task StartPollingAsync(String currentUserName, CancellationToken cancellationToken)
     {
         const Int32 PollingInterval = 1000;// 1 секунда
@@ -50,11 +59,18 @@ public sealed class ChatPollingService
         }
     }
 
+    /// <summary>
+    /// Обновляет время последнего полученного сообщения
+    /// </summary>
     public void UpdateLastMessageTime(DateTime timestamp)
     {
         if (timestamp > _lastMessageTime)
             _lastMessageTime = timestamp;
     }
+
+    /// <summary>
+    /// Получает все сообщения указанного пользователя
+    /// </summary>
     public async Task GetMessagesByUserName(String targetUserName, CancellationToken cancellationToken)
     { 
         var response = await _apiClient.GetMessagesForNameAsync(Limit, targetUserName, cancellationToken);
@@ -69,6 +85,9 @@ public sealed class ChatPollingService
     }
 }
 
+/// <summary>
+/// Аргументы события получения сообщения
+/// </summary>
 public sealed class MessageReceivedEventArgs : EventArgs
 {
     public ChatApp.Contracts.Messages.ChatMessageDto Message { get; }
