@@ -21,6 +21,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(u => u.PasswordHash)
+            .HasColumnName("password_hash")
+            .HasMaxLength(500)
+            .IsRequired()
+            .HasDefaultValue("temp_password_hash_needs_reset");
+
         builder.Property(u => u.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -29,14 +35,43 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("last_seen_at")
             .IsRequired();
 
-        builder.HasMany<ChatMessage>(u => u.Messages)
-            .WithOne()
-            .HasForeignKey(m => m.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.Metadata
             .FindNavigation(nameof(User.Messages))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+
+        builder.OwnsMany(u => u.Messages, messagesBuilder =>
+        {
+            messagesBuilder.ToTable("messages");
+
+            messagesBuilder.WithOwner()
+                .HasForeignKey(m => m.UserId);
+
+            messagesBuilder.Property(m => m.Id)
+                .HasColumnName("id")
+                .ValueGeneratedNever();
+
+            messagesBuilder.Property(m => m.UserId)
+                .HasColumnName("user_id")
+                .IsRequired();
+
+            messagesBuilder.Property(m => m.Content)
+                .HasColumnName("content")
+                .HasMaxLength(1000)
+                .IsRequired();
+
+            messagesBuilder.Property(m => m.Timestamp)
+                .HasColumnName("timestamp")
+                .IsRequired();
+
+            messagesBuilder.HasKey(m => m.Id);
+
+            messagesBuilder.HasIndex(m => m.Timestamp)
+                .HasDatabaseName("ix_messages_timestamp");
+
+            messagesBuilder.HasIndex(m => m.UserId)
+                .HasDatabaseName("ix_messages_user_id");
+        });
 
         builder.HasIndex(u => u.Username)
             .IsUnique()

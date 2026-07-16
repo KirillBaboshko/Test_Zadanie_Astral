@@ -1,3 +1,4 @@
+using ChatApp.Server.Application.UseCases.Auth;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUserInfo;
 using ChatApp.Server.Application.UseCases.GetUsers;
@@ -5,27 +6,46 @@ using ChatApp.Server.Application.UseCases.SendMessage;
 using ChatApp.Server.Infrastructure;
 using ChatApp.Server.Infrastructure.Data;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Cryptography;
+var rsa = RSA.Create(2048);
+var rsaKey = new RsaSecurityKey(rsa);
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new()
-    {
-        Title = "Chat API",
-        Version = "v1",
-        Description = "HTTP Chat API с Clean Architecture"
-    });
-});
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddSingleton(rsaKey);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = rsaKey,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 builder.Services.AddValidatorsFromAssemblyContaining<SendMessageUseCase>();
 
+builder.Services.AddScoped<RegisterUseCase>();
+builder.Services.AddScoped<LoginUseCase>();
 builder.Services.AddScoped<SendMessageUseCase>();
 builder.Services.AddScoped<GetMessagesUseCase>();
 builder.Services.AddScoped<GetUsersUseCase>();
@@ -82,6 +102,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

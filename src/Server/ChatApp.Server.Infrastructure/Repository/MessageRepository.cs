@@ -15,12 +15,11 @@ internal sealed class MessageRepository : IMessageRepository
     }
 
     /// <summary>
-    /// Добавляет новое сообщение в контекст БД
+    /// Добавляет новое сообщение в контекст БД (не используется, сообщения добавляются через User.AddMessage)
     /// </summary>
-    public async Task<ChatMessage> AddAsync(ChatMessage message, CancellationToken cancellationToken = default)
+    public Task<ChatMessage> AddAsync(ChatMessage message, CancellationToken cancellationToken = default)
     {
-        await _context.Messages.AddAsync(message, cancellationToken);
-        return message;
+        throw new NotSupportedException("Сообщения должны добавляться через User.AddMessage()");
     }
 
     /// <summary>
@@ -28,8 +27,9 @@ internal sealed class MessageRepository : IMessageRepository
     /// </summary>
     public async Task<List<ChatMessage>> GetAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default)
     {
-        var query = _context.Messages
+        var query = _context.Users
             .AsNoTracking()
+            .SelectMany(u => u.Messages)
             .AsQueryable();
 
         if (since.HasValue)
@@ -46,9 +46,10 @@ internal sealed class MessageRepository : IMessageRepository
     /// </summary>
     public async Task<List<ChatMessage>> GetForUserIdAsync(Guid userId, Int32 limit = 100, CancellationToken cancellationToken = default)
     {
-        return await _context.Messages
+        return await _context.Users
             .AsNoTracking()
-            .Where(m => m.UserId == userId)
+            .Where(u => u.Id == userId)
+            .SelectMany(u => u.Messages)
             .OrderBy(m => m.Timestamp)
             .Take(limit)
             .ToListAsync(cancellationToken);
@@ -59,7 +60,10 @@ internal sealed class MessageRepository : IMessageRepository
     /// </summary>
     public async Task<Int32> GetTotalCountAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Messages.CountAsync(cancellationToken);
+        return await _context.Users
+            .AsNoTracking()
+            .SelectMany(u => u.Messages)
+            .CountAsync(cancellationToken);
     }
    
     /// <summary>
@@ -67,8 +71,10 @@ internal sealed class MessageRepository : IMessageRepository
     /// </summary>
     public async Task<Int32> GetCountForUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await _context.Messages
-            .Where(m => m.UserId == userId)
+        return await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .SelectMany(u => u.Messages)
             .CountAsync(cancellationToken);
     }
 }

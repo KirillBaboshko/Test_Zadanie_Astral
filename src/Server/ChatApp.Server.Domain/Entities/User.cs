@@ -5,19 +5,27 @@ public sealed class User
 
     public Guid Id { get; private set; }
     public String Username { get; private set; } = String.Empty;
+    public String PasswordHash { get; private set; } = String.Empty;
     public DateTime CreatedAt { get; private set; }
     public DateTime LastSeenAt { get; private set; }
     public IReadOnlyList<ChatMessage> Messages => _messages;
 
     private User() { }
 
-    public User(String username)
+    /// <summary>
+    /// Создаёт нового пользователя (для регистрации)
+    /// </summary>
+    public User(String username, String passwordHash)
     {
         if (String.IsNullOrWhiteSpace(username))
             throw new ArgumentException("Имя пользователя не может быть пустым", nameof(username));
 
+        if (String.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException("Хеш пароля не может быть пустым", nameof(passwordHash));
+
         Id = Guid.NewGuid();
         Username = username.Trim();
+        PasswordHash = passwordHash;
         CreatedAt = DateTime.UtcNow;
         LastSeenAt = DateTime.UtcNow;
     }
@@ -28,6 +36,17 @@ public sealed class User
     public void UpdateLastSeen()
     {
         LastSeenAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Изменяет пароль пользователя
+    /// </summary>
+    public void ChangePassword(String newPasswordHash)
+    {
+        if (String.IsNullOrWhiteSpace(newPasswordHash))
+            throw new ArgumentException("Хеш пароля не может быть пустым", nameof(newPasswordHash));
+
+        PasswordHash = newPasswordHash;
     }
 
     /// <summary>

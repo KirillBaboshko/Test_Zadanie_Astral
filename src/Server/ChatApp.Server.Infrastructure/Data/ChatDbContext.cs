@@ -10,7 +10,8 @@ public sealed class ChatDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
-    public DbSet<ChatMessage> Messages => Set<ChatMessage>();
+    
+   
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

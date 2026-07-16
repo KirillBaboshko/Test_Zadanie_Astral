@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ChatApp.Server.Infrastructure.Migrations
 {
     [DbContext(typeof(ChatDbContext))]
-    [Migration("20260715093851_AddUsersTable")]
-    partial class AddUsersTable
+    [Migration("20260716091311_InitialWithAuth")]
+    partial class InitialWithAuth
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,37 +24,6 @@ namespace ChatApp.Server.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("ChatApp.Server.Domain.Entities.ChatMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("content");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("timestamp");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Timestamp")
-                        .HasDatabaseName("ix_messages_timestamp");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_messages_user_id");
-
-                    b.ToTable("messages", (string)null);
-                });
 
             modelBuilder.Entity("ChatApp.Server.Domain.Entities.User", b =>
                 {
@@ -69,6 +38,14 @@ namespace ChatApp.Server.Infrastructure.Migrations
                     b.Property<DateTime>("LastSeenAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_seen_at");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("temp_password_hash_needs_reset")
+                        .HasColumnName("password_hash");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -88,19 +65,42 @@ namespace ChatApp.Server.Infrastructure.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("ChatApp.Server.Domain.Entities.ChatMessage", b =>
-                {
-                    b.HasOne("ChatApp.Server.Domain.Entities.User", "User")
-                        .WithMany("Messages")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ChatApp.Server.Domain.Entities.User", b =>
                 {
+                    b.OwnsMany("ChatApp.Server.Domain.Entities.ChatMessage", "Messages", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Content")
+                                .IsRequired()
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)")
+                                .HasColumnName("content");
+
+                            b1.Property<DateTime>("Timestamp")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("timestamp");
+
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("user_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("Timestamp")
+                                .HasDatabaseName("ix_messages_timestamp");
+
+                            b1.HasIndex("UserId")
+                                .HasDatabaseName("ix_messages_user_id");
+
+                            b1.ToTable("messages", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId");
+                        });
+
                     b.Navigation("Messages");
                 });
 #pragma warning restore 612, 618
