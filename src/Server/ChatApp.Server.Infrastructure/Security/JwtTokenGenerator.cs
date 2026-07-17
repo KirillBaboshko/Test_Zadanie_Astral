@@ -1,7 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text.Json;
 using ChatApp.Server.Domain.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -45,24 +43,5 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    /// <summary>
-    /// Экспортирует публичный ключ в формате JWK (для проверки токенов)
-    /// </summary>
-    public String GetPublicKeyJwk()
-    {
-        var parameters = _securityKey.Rsa.ExportParameters(false);
-        
-        var jwk = new
-        {
-            kty = "RSA",
-            use = "sig",
-            kid = Convert.ToBase64String(parameters.Modulus![..8]),
-            n = Convert.ToBase64String(parameters.Modulus!),
-            e = Convert.ToBase64String(parameters.Exponent!)
-        };
-
-        return JsonSerializer.Serialize(jwk);
     }
 }

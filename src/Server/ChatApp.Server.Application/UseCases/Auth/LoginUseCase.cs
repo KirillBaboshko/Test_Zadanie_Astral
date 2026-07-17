@@ -26,18 +26,16 @@ public sealed class LoginUseCase
     /// </summary>
     public async Task<AuthResponse?> ExecuteAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        // Находим пользователя
+        
         var user = await _userRepository.GetByUsernameAsync(request.Username, cancellationToken);
         if (user == null)
-            return null; // Пользователь не найден
+            return null; 
 
-        // Проверяем пароль
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
-            return null; // Неверный пароль
+            return null; 
 
-        // Обновляем время последней активности
+        // Обновляем время последней активности (ChangeTracker автоматически отследит изменения)
         user.UpdateLastSeen();
-        await _userRepository.UpdateAsync(user, cancellationToken);
 
         // Генерируем JWT токен
         var token = _jwtTokenGenerator.GenerateToken(user.Id, user.Username);

@@ -151,30 +151,6 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
     }
 
     /// <summary>
-    /// Отправляет новое сообщение (старый метод без авторизации)
-    /// </summary>
-    public async Task<ChatMessageDto?> SendMessageLegacyAsync(SendMessageRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await _httpClient.PostAsJsonAsync("api/chat/messages/legacy", request, cancellationToken);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"Ошибка отправки сообщения: {response.StatusCode}");
-                return null;
-            }
-
-            return await response.Content.ReadFromJsonAsync<ChatMessageDto>(cancellationToken: cancellationToken);
-        }
-        catch (HttpRequestException ex)
-        {
-            Console.WriteLine($"Ошибка сети: {ex.Message}");
-            return null;
-        }
-    }
-
-    /// <summary>
     /// Получает список сообщений с возможностью фильтрации по времени
     /// </summary>
     public async Task<GetMessagesResponse?> GetMessagesAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default)

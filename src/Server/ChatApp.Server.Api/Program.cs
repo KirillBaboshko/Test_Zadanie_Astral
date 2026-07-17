@@ -1,3 +1,4 @@
+using ChatApp.Server.Api.BackgroundServices;
 using ChatApp.Server.Application.UseCases.Auth;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUserInfo;
@@ -51,6 +52,9 @@ builder.Services.AddScoped<GetMessagesUseCase>();
 builder.Services.AddScoped<GetUsersUseCase>();
 builder.Services.AddScoped<GetUserInfoUseCase>();
 
+// Регистрация фонового сервиса для очистки сообщений
+builder.Services.AddHostedService<MessageCleanupService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -99,8 +103,12 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = string.Empty;
     });
 }
+else
+{
+    // HTTPS редирект только в Production
+    app.UseHttpsRedirection();
+}
 
-app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

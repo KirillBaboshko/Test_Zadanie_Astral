@@ -22,7 +22,6 @@ public class ChatController : ControllerBase
     private readonly GetMessagesUseCase _getMessagesUseCase;
     private readonly GetUsersUseCase _getUsersUseCase;
     private readonly GetUserInfoUseCase _getUserInfoUseCase;
-    private readonly IValidator<SendMessageRequest> _sendMessageValidator;
     private readonly IValidator<SendMessageAuthRequest> _sendMessageAuthValidator;
 
     public ChatController(
@@ -30,14 +29,12 @@ public class ChatController : ControllerBase
         GetMessagesUseCase getMessagesUseCase,
         GetUsersUseCase getUsersUseCase,
         GetUserInfoUseCase getUserInfoUseCase,
-        IValidator<SendMessageRequest> sendMessageValidator,
         IValidator<SendMessageAuthRequest> sendMessageAuthValidator)
     {
         _sendMessageUseCase = sendMessageUseCase ?? throw new ArgumentNullException(nameof(sendMessageUseCase));
         _getMessagesUseCase = getMessagesUseCase ?? throw new ArgumentNullException(nameof(getMessagesUseCase));
         _getUsersUseCase = getUsersUseCase ?? throw new ArgumentNullException(nameof(getUsersUseCase));
         _getUserInfoUseCase = getUserInfoUseCase ?? throw new ArgumentNullException(nameof(getUserInfoUseCase));
-        _sendMessageValidator = sendMessageValidator ?? throw new ArgumentNullException(nameof(sendMessageValidator));
         _sendMessageAuthValidator = sendMessageAuthValidator ?? throw new ArgumentNullException(nameof(sendMessageAuthValidator));
     }
 
@@ -71,34 +68,6 @@ public class ChatController : ControllerBase
 
         if (message == null)
             return NotFound(new { error = "Пользователь не найден" });
-
-        return CreatedAtAction(nameof(GetMessages), new { since = message.Timestamp }, message);
-    }
-
-    [HttpPost("messages/legacy")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ChatMessageDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ChatMessageDto>> SendMessageLegacy(
-        [FromBody] SendMessageRequest request,
-        CancellationToken cancellationToken)
-    {
-        var validationResult = await _sendMessageValidator.ValidateAsync(request, cancellationToken);
-        
-        if (!validationResult.IsValid)
-        {
-            foreach (var error in validationResult.Errors)
-            {
-                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
-            }
-            return BadRequest(ModelState);
-        }
-
-        var message = await _sendMessageUseCase.ExecuteAsync(request, cancellationToken);
-
-        if (message == null)
-            return NotFound(new { error = $"Пользователь '{request.SenderName}' не найден. Необходимо сначала зарегистрироваться" });
 
         return CreatedAtAction(nameof(GetMessages), new { since = message.Timestamp }, message);
     }

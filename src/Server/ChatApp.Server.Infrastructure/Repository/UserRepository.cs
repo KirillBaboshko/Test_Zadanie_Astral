@@ -23,7 +23,6 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByUsernameAsync(String username, CancellationToken cancellationToken = default)
     {
         return await _context.Users
-            .AsTracking()
             .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
     }
 
@@ -33,7 +32,6 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Users
-            .AsTracking()
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
@@ -43,7 +41,6 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByUsernameWithMessagesAsync(String username, CancellationToken cancellationToken = default)
     {
         return await _context.Users
-            .AsTracking()
             .Include(u => u.Messages)
             .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
     }
@@ -54,7 +51,6 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByIdWithMessagesAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Users
-            .AsTracking()
             .Include(u => u.Messages)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
@@ -66,14 +62,6 @@ public sealed class UserRepository : IUserRepository
     {
         await _context.Users.AddAsync(user, cancellationToken);
         return user;
-    }
-
-    /// <summary>
-    /// Обновляет данные пользователя в контексте БД
-    /// </summary>
-    public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
-    {
-       _context.Users.Update(user);
     }
 
     /// <summary>

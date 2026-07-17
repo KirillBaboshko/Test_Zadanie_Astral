@@ -10,7 +10,6 @@ public interface IUserRepository
     Task<User?> GetByUsernameWithMessagesAsync(String username, CancellationToken cancellationToken = default);
     Task<User?> GetByIdWithMessagesAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User> AddAsync(User user, CancellationToken cancellationToken = default);
-    Task UpdateAsync(User user, CancellationToken cancellationToken = default);
     Task<List<User>> GetAllAsync(CancellationToken cancellationToken = default);
     
     Task<List<ChatMessage>> GetAllMessagesAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default);
