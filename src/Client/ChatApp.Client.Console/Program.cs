@@ -1,26 +1,43 @@
 ﻿using System.Text;
 using ChatApp.Client.Application.Services;
+using ChatApp.Client.Infrastructure.Grpc;
 using ChatApp.Client.Infrastructure.Http;
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
 using static System.Console;
 
+// Включаем HTTP/2 без TLS для gRPC (необходимо для Windows в dev режиме)
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
 OutputEncoding = Encoding.UTF8;
 InputEncoding = Encoding.UTF8;
 
-WriteLine("=== HTTP Chat Client с JWT аутентификацией ===");
+WriteLine("=== Chat Client с JWT аутентификацией ===");
 WriteLine();
 
-Write("URL сервера (по умолчанию http://localhost:5096): ");
+// Выбор протокола
+WriteLine("Выберите протокол:");
+WriteLine("1. HTTP (REST API)");
+WriteLine("2. gRPC");
+Write("Выбор (по умолчанию 1): ");
+String? protocolChoice = ReadLine();
+bool useGrpc = protocolChoice == "2";
+
+WriteLine();
+Write($"URL сервера (по умолчанию {(useGrpc ? "http://localhost:5097" : "http://localhost:5096")}): ");
 String? serverUrl = ReadLine();
 if (String.IsNullOrWhiteSpace(serverUrl))
-    serverUrl = "http://localhost:5096";
+    serverUrl = useGrpc ? "http://localhost:5097" : "http://localhost:5096";
 
 WriteLine();
-WriteLine($"Подключение к серверу {serverUrl}...");
+WriteLine($"Подключение к серверу {serverUrl} через {(useGrpc ? "gRPC" : "HTTP")}...");
 WriteLine();
 
-using var apiClient = new HttpChatApiClient(serverUrl);
+// Создаём клиент в зависимости от выбранного протокола
+IChatApiClient apiClient = useGrpc 
+    ? new GrpcChatApiClient(serverUrl) 
+    : new HttpChatApiClient(serverUrl);
+
 using var cts = new CancellationTokenSource();
 
 CancelKeyPress += (_, e) =>
@@ -35,13 +52,13 @@ String? currentUsername = null;
 // Меню авторизации
 while (authResponse == null && !cts.Token.IsCancellationRequested)
 {
-    WriteLine("╔════════════════════════════════╗");
-    WriteLine("║   МЕНЮ АУТЕНТИФИКАЦИИ          ║");
-    WriteLine("╠════════════════════════════════╣");
-    WriteLine("║ 1. Регистрация                 ║");
-    WriteLine("║ 2. Вход                        ║");
-    WriteLine("║ 0. Выход                       ║");
-    WriteLine("╚════════════════════════════════╝");
+    WriteLine("================================");
+    WriteLine("   МЕНЮ АУТЕНТИФИКАЦИИ");
+    WriteLine("================================");
+    WriteLine(" 1. Регистрация");
+    WriteLine(" 2. Вход");
+    WriteLine(" 0. Выход");
+    WriteLine("================================");
     Write("Выберите действие: ");
     
     String? choice = ReadLine();
@@ -59,12 +76,12 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             
             if (String.IsNullOrWhiteSpace(regUsername) || String.IsNullOrWhiteSpace(regPassword))
             {
-                WriteLine("❌ Имя пользователя и пароль не могут быть пустыми!");
+                WriteLine("[ОШИБКА] Имя пользователя и пароль не могут быть пустыми!");
                 WriteLine();
                 break;
             }
 
-            WriteLine("⏳ Регистрация...");
+            WriteLine("Регистрация...");
             var registerRequest = new RegisterRequest
             {
                 Username = regUsername,
@@ -76,12 +93,12 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             if (authResponse != null)
             {
                 currentUsername = authResponse.Username;
-                WriteLine($"✅ Регистрация успешна! Добро пожаловать, {currentUsername}!");
-                WriteLine($"🔑 Токен действителен до: {authResponse.ExpiresAt.ToLocalTime():dd.MM.yyyy HH:mm:ss}");
+                WriteLine($"[OK] Регистрация успешна! Добро пожаловать, {currentUsername}!");
+                WriteLine($"Токен действителен до: {authResponse.ExpiresAt.ToLocalTime():dd.MM.yyyy HH:mm:ss}");
             }
             else
             {
-                WriteLine("❌ Ошибка регистрации. Возможно, пользователь уже существует.");
+                WriteLine("[ОШИБКА] Ошибка регистрации. Возможно, пользователь уже существует.");
             }
             WriteLine();
             break;
@@ -96,12 +113,12 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             
             if (String.IsNullOrWhiteSpace(loginUsername) || String.IsNullOrWhiteSpace(loginPassword))
             {
-                WriteLine("❌ Имя пользователя и пароль не могут быть пустыми!");
+                WriteLine("[ОШИБКА] Имя пользователя и пароль не могут быть пустыми!");
                 WriteLine();
                 break;
             }
 
-            WriteLine("⏳ Авторизация...");
+            WriteLine("Авторизация...");
             var loginRequest = new LoginRequest
             {
                 Username = loginUsername,
@@ -113,12 +130,12 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             if (authResponse != null)
             {
                 currentUsername = authResponse.Username;
-                WriteLine($"✅ Вход выполнен! Добро пожаловать, {currentUsername}!");
-                WriteLine($"🔑 Токен действителен до: {authResponse.ExpiresAt.ToLocalTime():dd.MM.yyyy HH:mm:ss}");
+                WriteLine($"[OK] Вход выполнен! Добро пожаловать, {currentUsername}!");
+                WriteLine($"Токен действителен до: {authResponse.ExpiresAt.ToLocalTime():dd.MM.yyyy HH:mm:ss}");
             }
             else
             {
-                WriteLine("❌ Неверное имя пользователя или пароль.");
+                WriteLine("[ОШИБКА] Неверное имя пользователя или пароль.");
             }
             WriteLine();
             break;
@@ -129,7 +146,7 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             return 0;
 
         default:
-            WriteLine("❌ Неверный выбор. Попробуйте снова.");
+            WriteLine("[ОШИБКА] Неверный выбор. Попробуйте снова.");
             WriteLine();
             break;
     }
@@ -143,15 +160,15 @@ if (authResponse == null || currentUsername == null)
 
 // Главное меню чата
 WriteLine();
-WriteLine("╔════════════════════════════════╗");
-WriteLine("║       ЧАТ ПРИЛОЖЕНИЕ           ║");
-WriteLine("╠════════════════════════════════╣");
-WriteLine("║ Команды:                       ║");
-WriteLine("║ /help     - помощь             ║");
-WriteLine("║ /messages - все сообщения      ║");
-WriteLine("║ /user     - сообщения юзера    ║");
-WriteLine("║ /exit     - выход              ║");
-WriteLine("╚════════════════════════════════╝");
+WriteLine("================================");
+WriteLine("       ЧАТ ПРИЛОЖЕНИЕ");
+WriteLine("================================");
+WriteLine(" Команды:");
+WriteLine(" /help     - помощь");
+WriteLine(" /messages - все сообщения");
+WriteLine(" /user     - сообщения юзера");
+WriteLine(" /exit     - выход");
+WriteLine("================================");
 WriteLine();
 
 var pollingService = new ChatPollingService(apiClient);
@@ -184,7 +201,7 @@ try
         if (input.Equals("/help", StringComparison.OrdinalIgnoreCase))
         {
             WriteLine();
-            WriteLine("═══ Доступные команды ═══");
+            WriteLine("--- Доступные команды ---");
             WriteLine("/help     - показать эту справку");
             WriteLine("/messages - показать все сообщения");
             WriteLine("/user     - показать сообщения конкретного пользователя");
@@ -196,13 +213,13 @@ try
 
         if (input.Equals("/messages", StringComparison.OrdinalIgnoreCase))
         {
-            WriteLine("⏳ Загрузка всех сообщений...");
+            WriteLine("Загрузка всех сообщений...");
             var messagesResponse = await apiClient.GetMessagesAsync(limit: 50, cancellationToken: cts.Token);
             
             if (messagesResponse != null && messagesResponse.Messages.Count > 0)
             {
                 WriteLine();
-                WriteLine($"═══ Последние {messagesResponse.Messages.Count} сообщений (всего: {messagesResponse.TotalCount}) ═══");
+                WriteLine($"--- Последние {messagesResponse.Messages.Count} сообщений (всего: {messagesResponse.TotalCount}) ---");
                 foreach (var msg in messagesResponse.Messages)
                 {
                     WriteLine($"[{msg.Timestamp.ToLocalTime():HH:mm:ss}] {msg.SenderName}: {msg.Content}");

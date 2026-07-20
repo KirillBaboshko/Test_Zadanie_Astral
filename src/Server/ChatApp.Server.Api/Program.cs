@@ -1,4 +1,5 @@
 using ChatApp.Server.Api.BackgroundServices;
+using ChatApp.Server.Api.GrpcServices;
 using ChatApp.Server.Application.UseCases.Auth;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUserInfo;
@@ -11,15 +12,35 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
+
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
 var rsa = RSA.Create(2048);
 var rsaKey = new RsaSecurityKey(rsa);
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Порт 5096 - HTTP/1.1 для REST API
+    options.ListenLocalhost(5096, listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1;
+    });
+    
+    // Порт 5097 - HTTP/2 для gRPC без TLS
+    options.ListenLocalhost(5097, listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
+    });
+});
+
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddGrpc();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -52,7 +73,7 @@ builder.Services.AddScoped<GetMessagesUseCase>();
 builder.Services.AddScoped<GetUsersUseCase>();
 builder.Services.AddScoped<GetUserInfoUseCase>();
 
-// Регистрация фонового сервиса для очистки сообщений
+
 builder.Services.AddHostedService<MessageCleanupService>();
 
 builder.Services.AddCors(options =>
@@ -105,13 +126,19 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    // HTTPS редирект только в Production
     app.UseHttpsRedirection();
 }
 
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
+
+app.MapGrpcService<GrpcAuthService>();
+app.MapGrpcService<GrpcChatService>();
+
+
+app.MapGet("/grpc", () => "gRPC endpoints: AuthService, ChatService");
 
 app.Run();
