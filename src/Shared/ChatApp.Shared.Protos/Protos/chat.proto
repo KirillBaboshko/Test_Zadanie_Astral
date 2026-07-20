@@ -1,57 +1,42 @@
 syntax = "proto3";
 
-option csharp_namespace = "ChatApp.Server.Api.Grpc";
+option csharp_namespace = "ChatApp.Shared.Grpc";
 
 package chat;
 
-// Сервис для работы с чатом
+
 service ChatService {
-  // Отправка сообщения
   rpc SendMessage (SendMessageRequest) returns (MessageResponse);
-  
-  // Получение сообщений
   rpc GetMessages (GetMessagesRequest) returns (MessagesListResponse);
-  
-  // Получение сообщений конкретного пользователя
   rpc GetMessagesByUser (GetMessagesByUserRequest) returns (MessagesListResponse);
-  
-  // Получение списка пользователей
   rpc GetUsers (GetUsersRequest) returns (UsersListResponse);
-  
-  // Стриминг новых сообщений (Server-side streaming)
   rpc StreamMessages (StreamMessagesRequest) returns (stream MessageResponse);
 }
 
-// Запрос на отправку сообщения
 message SendMessageRequest {
   string content = 1;
   string token = 2; // JWT токен для аутентификации
 }
 
-// Запрос на получение сообщений
 message GetMessagesRequest {
   int64 since_timestamp = 1; // Unix timestamp в миллисекундах (optional)
   int32 limit = 2;
 }
 
-// Запрос на получение сообщений пользователя
 message GetMessagesByUserRequest {
   string username = 1;
   int32 limit = 2;
 }
 
-// Запрос на получение пользователей
 message GetUsersRequest {
   // Пустой запрос
 }
 
-// Запрос на стриминг сообщений
 message StreamMessagesRequest {
   string token = 1;
   int64 since_timestamp = 2;
 }
 
-// Ответ с сообщением
 message MessageResponse {
   string id = 1;
   string sender_name = 2;
@@ -59,19 +44,15 @@ message MessageResponse {
   int64 timestamp = 4; // Unix timestamp в миллисекундах
 }
 
-// Ответ со списком сообщений
 message MessagesListResponse {
   repeated MessageResponse messages = 1;
   int32 total_count = 2;
 }
 
-// Информация о пользователе
 message UserInfo {
   string id = 1;
   string username = 2;
 }
-
-// Ответ со списком пользователей
 message UsersListResponse {
   repeated UserInfo users = 1;
 }

@@ -1,5 +1,5 @@
 using ChatApp.Contracts.Requests;
-using ChatApp.Server.Api.Grpc;
+using ChatApp.Shared.Grpc;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUsers;
 using ChatApp.Server.Application.UseCases.SendMessage;
@@ -9,9 +9,6 @@ using System.IdentityModel.Tokens.Jwt;
 
 namespace ChatApp.Server.Api.GrpcServices;
 
-/// <summary>
-/// gRPC сервис для работы с чатом
-/// </summary>
 public class GrpcChatService : ChatService.ChatServiceBase
 {
     private readonly SendMessageUseCase _sendMessageUseCase;
@@ -44,14 +41,14 @@ public class GrpcChatService : ChatService.ChatServiceBase
     {
         try
         {
-            // Валидация и парсинг токена
+            var serverInfo = $"[Server Port: {context.Host}]";
             var userId = ValidateTokenAndGetUserId(request.Token);
             if (userId == null)
             {
                 throw new RpcException(new Status(StatusCode.Unauthenticated, "Invalid or expired token"));
             }
 
-            _logger.LogDebug("gRPC SendMessage request from user: {UserId}", userId);
+            _logger.LogInformation("{ServerInfo} gRPC SendMessage request from user: {UserId}", serverInfo, userId);
 
             var contractRequest = new SendMessageAuthRequest
             {

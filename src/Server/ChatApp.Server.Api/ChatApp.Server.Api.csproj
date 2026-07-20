@@ -21,11 +21,7 @@
     <ProjectReference Include="..\ChatApp.Server.Application\ChatApp.Server.Application.csproj" />
     <ProjectReference Include="..\ChatApp.Server.Infrastructure\ChatApp.Server.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Shared\ChatApp.Contracts\ChatApp.Contracts.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Protobuf Include="Protos\chat.proto" GrpcServices="Server" />
-    <Protobuf Include="Protos\auth.proto" GrpcServices="Server" />
+    <ProjectReference Include="..\..\Shared\ChatApp.Shared.Protos\ChatApp.Shared.Protos.csproj" />
   </ItemGroup>
 
 </Project>

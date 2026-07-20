@@ -20,20 +20,26 @@ var rsaKey = new RsaSecurityKey(rsa);
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Получаем порты из переменных окружения или используем значения по умолчанию
+var httpPort = int.TryParse(Environment.GetEnvironmentVariable("HTTP_PORT"), out var hPort) ? hPort : 5096;
+var grpcPort = int.TryParse(Environment.GetEnvironmentVariable("GRPC_PORT"), out var gPort) ? gPort : 5097;
+
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // Порт 5096 - HTTP/1.1 для REST API
-    options.ListenLocalhost(5096, listenOptions =>
+    // HTTP/1.1 для REST API
+    options.ListenLocalhost(httpPort, listenOptions =>
     {
         listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1;
     });
     
-    // Порт 5097 - HTTP/2 для gRPC без TLS
-    options.ListenLocalhost(5097, listenOptions =>
+    // HTTP/2 для gRPC без TLS
+    options.ListenLocalhost(grpcPort, listenOptions =>
     {
         listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
     });
 });
+
+Console.WriteLine($"Server configured: HTTP port {httpPort}, gRPC port {grpcPort}");
 
 builder.Services.AddControllers();
 

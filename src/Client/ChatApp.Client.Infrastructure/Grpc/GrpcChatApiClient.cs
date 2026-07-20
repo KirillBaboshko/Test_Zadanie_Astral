@@ -2,15 +2,12 @@ using ChatApp.Client.Application.Services;
 using ChatApp.Contracts.Messages;
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
-using ChatApp.Server.Api.Grpc;
+using ChatApp.Shared.Grpc;
 using Grpc.Core;
 using Grpc.Net.Client;
 
 namespace ChatApp.Client.Infrastructure.Grpc;
 
-/// <summary>
-/// gRPC клиент для работы с чатом с поддержкой DNS round-robin
-/// </summary>
 public class GrpcChatApiClient : IChatApiClient
 {
     private readonly GrpcChannel _channel;
@@ -22,17 +19,18 @@ public class GrpcChatApiClient : IChatApiClient
     public GrpcChatApiClient(String baseUrl)
     {
         _baseUrl = baseUrl;
-
-        // Настраиваем gRPC канал с DNS round-robin балансировкой
+        const Int32 delay = 60;
+        const Int32 timeout = 30;
+        
         var channelOptions = new GrpcChannelOptions
         {
             // HTTP/2 keep-alive для поддержания соединения
             HttpHandler = new SocketsHttpHandler
             {
                 PooledConnectionIdleTimeout = Timeout.InfiniteTimeSpan,
-                KeepAlivePingDelay = TimeSpan.FromSeconds(60),
-                KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
-                EnableMultipleHttp2Connections = true
+                KeepAlivePingDelay = TimeSpan.FromSeconds(delay),
+                KeepAlivePingTimeout = TimeSpan.FromSeconds(timeout),
+                EnableMultipleHttp2Connections = true // Для пулинга коннектов к репликам
             }
         };
 
@@ -77,8 +75,6 @@ public class GrpcChatApiClient : IChatApiClient
                 Console.WriteLine($"Ошибка регистрации: {response.Error}");
                 return null;
             }
-
-            // Устанавливаем токен для последующих запросов
             SetAuthToken(response.Token);
 
             return new AuthResponse
@@ -121,7 +117,6 @@ public class GrpcChatApiClient : IChatApiClient
                 return null;
             }
 
-            // Устанавливаем токен для последующих запросов
             SetAuthToken(response.Token);
 
             return new AuthResponse
@@ -156,7 +151,7 @@ public class GrpcChatApiClient : IChatApiClient
                 return null;
             }
 
-            var grpcRequest = new Server.Api.Grpc.SendMessageRequest
+            var grpcRequest = new SendMessageRequest
             {
                 Token = _authToken,
                 Content = request.Content
@@ -196,7 +191,7 @@ public class GrpcChatApiClient : IChatApiClient
     {
         try
         {
-            var grpcRequest = new Server.Api.Grpc.GetMessagesRequest
+            var grpcRequest = new GetMessagesRequest
             {
                 SinceTimestamp = since.HasValue 
                     ? new DateTimeOffset(since.Value).ToUnixTimeMilliseconds() 
@@ -245,7 +240,7 @@ public class GrpcChatApiClient : IChatApiClient
                 return null;
             }
 
-            var grpcRequest = new Server.Api.Grpc.GetMessagesByUserRequest
+            var grpcRequest = new GetMessagesByUserRequest
             {
                 Username = senderName,
                 Limit = limit
@@ -297,7 +292,7 @@ public class GrpcChatApiClient : IChatApiClient
                 return;
             }
 
-            var request = new Server.Api.Grpc.StreamMessagesRequest
+            var request = new StreamMessagesRequest
             {
                 Token = _authToken,
                 SinceTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()

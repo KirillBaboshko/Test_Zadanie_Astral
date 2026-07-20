@@ -1,31 +1,25 @@
 syntax = "proto3";
 
-option csharp_namespace = "ChatApp.Server.Api.Grpc";
+option csharp_namespace = "ChatApp.Shared.Grpc";
 
 package auth;
 
-// Сервис аутентификации
 service AuthService {
-  // Регистрация пользователя
   rpc Register (RegisterRequestProto) returns (AuthResponseProto);
-  
-  // Вход пользователя
+
   rpc Login (LoginRequestProto) returns (AuthResponseProto);
 }
 
-// Запрос на регистрацию
 message RegisterRequestProto {
   string username = 1;
   string password = 2;
 }
 
-// Запрос на вход
 message LoginRequestProto {
   string username = 1;
   string password = 2;
 }
 
-// Ответ с токеном
 message AuthResponseProto {
   string token = 1;
   string username = 2;

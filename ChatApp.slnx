@@ -13,5 +13,6 @@
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/ChatApp.Contracts/ChatApp.Contracts.csproj" />
+    <Project Path="src/Shared/ChatApp.Shared.Protos/ChatApp.Shared.Protos.csproj" />
   </Folder>
 </Solution>

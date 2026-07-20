@@ -1,13 +1,11 @@
 using ChatApp.Contracts.Requests;
-using ChatApp.Server.Api.Grpc;
+using ChatApp.Shared.Grpc;
 using ChatApp.Server.Application.UseCases.Auth;
 using Grpc.Core;
 
 namespace ChatApp.Server.Api.GrpcServices;
 
-/// <summary>
-/// gRPC сервис аутентификации
-/// </summary>
+
 public class GrpcAuthService : AuthService.AuthServiceBase
 {
     private readonly RegisterUseCase _registerUseCase;
@@ -31,7 +29,8 @@ public class GrpcAuthService : AuthService.AuthServiceBase
     {
         try
         {
-            _logger.LogDebug("gRPC Register request for username: {Username}", request.Username);
+            var serverInfo = $"[Server Port: {context.Host}]";
+            _logger.LogInformation("{ServerInfo} gRPC Register request for username: {Username}", serverInfo, request.Username);
 
             var contractRequest = new Contracts.Requests.RegisterRequest
             {
@@ -51,6 +50,8 @@ public class GrpcAuthService : AuthService.AuthServiceBase
                     Error = "Не удалось зарегистрировать пользователя"
                 };
             }
+
+            _logger.LogInformation("{ServerInfo} Registration successful for: {Username}", serverInfo, request.Username);
 
             return new AuthResponseProto
             {
@@ -86,7 +87,8 @@ public class GrpcAuthService : AuthService.AuthServiceBase
     {
         try
         {
-            _logger.LogDebug("gRPC Login request for username: {Username}", request.Username);
+            var serverInfo = $"[Server Port: {context.Host}]";
+            _logger.LogInformation("{ServerInfo} gRPC Login request for username: {Username}", serverInfo, request.Username);
 
             var contractRequest = new Contracts.Requests.LoginRequest
             {
@@ -106,6 +108,8 @@ public class GrpcAuthService : AuthService.AuthServiceBase
                     Error = "Неверное имя пользователя или пароль"
                 };
             }
+
+            _logger.LogInformation("{ServerInfo} Login successful for: {Username}", serverInfo, request.Username);
 
             return new AuthResponseProto
             {
