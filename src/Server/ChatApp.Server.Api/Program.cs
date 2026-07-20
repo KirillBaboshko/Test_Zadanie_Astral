@@ -11,6 +11,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using ProtoBuf.Grpc.Server;
 using System.Security.Cryptography;
 
 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
@@ -20,7 +21,7 @@ var rsaKey = new RsaSecurityKey(rsa);
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Получаем порты из переменных окружения или используем значения по умолчанию
+
 var httpPort = int.TryParse(Environment.GetEnvironmentVariable("HTTP_PORT"), out var hPort) ? hPort : 5096;
 var grpcPort = int.TryParse(Environment.GetEnvironmentVariable("GRPC_PORT"), out var gPort) ? gPort : 5097;
 
@@ -46,7 +47,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddGrpc();
+builder.Services.AddCodeFirstGrpc();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -141,10 +142,10 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapGrpcService<GrpcAuthService>();
-app.MapGrpcService<GrpcChatService>();
+// Code-first gRPC сервисы (новый подход)
+app.MapGrpcService<CodeFirstAuthService>();
+app.MapGrpcService<CodeFirstChatService>();
 
-
-app.MapGet("/grpc", () => "gRPC endpoints: AuthService, ChatService");
+app.MapGet("/grpc", () => "gRPC endpoints: Code-first (IAuthService, IChatService)");
 
 app.Run();

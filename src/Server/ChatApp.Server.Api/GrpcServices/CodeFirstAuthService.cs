@@ -1,35 +1,33 @@
-using ChatApp.Contracts.Requests;
-using ChatApp.Shared.Grpc;
 using ChatApp.Server.Application.UseCases.Auth;
-using Grpc.Core;
+using ChatApp.Shared.Grpc.Contracts;
+using ProtoBuf.Grpc;
 
 namespace ChatApp.Server.Api.GrpcServices;
 
-
-public class GrpcAuthService : AuthService.AuthServiceBase
+/// <summary>
+/// Реализация сервиса аутентификации через code-first подход
+/// </summary>
+public class CodeFirstAuthService : IAuthService
 {
     private readonly RegisterUseCase _registerUseCase;
     private readonly LoginUseCase _loginUseCase;
-    private readonly ILogger<GrpcAuthService> _logger;
+    private readonly ILogger<CodeFirstAuthService> _logger;
 
-    public GrpcAuthService(
+    public CodeFirstAuthService(
         RegisterUseCase registerUseCase,
         LoginUseCase loginUseCase,
-        ILogger<GrpcAuthService> logger)
+        ILogger<CodeFirstAuthService> logger)
     {
         _registerUseCase = registerUseCase;
         _loginUseCase = loginUseCase;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Регистрация пользователя через gRPC
-    /// </summary>
-    public override async Task<AuthResponseProto> Register(RegisterRequestProto request, ServerCallContext context)
+    public async Task<AuthResponse> Register(RegisterRequest request, CallContext context = default)
     {
         try
         {
-            var serverInfo = $"[Server Port: {context.Host}]";
+            var serverInfo = $"[Code-First Server]";
             _logger.LogInformation("{ServerInfo} gRPC Register request for username: {Username}", serverInfo, request.Username);
 
             var contractRequest = new Contracts.Requests.RegisterRequest
@@ -42,7 +40,7 @@ public class GrpcAuthService : AuthService.AuthServiceBase
 
             if (authResponse == null)
             {
-                return new AuthResponseProto
+                return new AuthResponse
                 {
                     Token = string.Empty,
                     Username = string.Empty,
@@ -53,7 +51,7 @@ public class GrpcAuthService : AuthService.AuthServiceBase
 
             _logger.LogInformation("{ServerInfo} Registration successful for: {Username}", serverInfo, request.Username);
 
-            return new AuthResponseProto
+            return new AuthResponse
             {
                 Token = authResponse.Token,
                 Username = authResponse.Username,
@@ -64,8 +62,8 @@ public class GrpcAuthService : AuthService.AuthServiceBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Registration failed for username: {Username}", request.Username);
-            
-            return new AuthResponseProto
+
+            return new AuthResponse
             {
                 Token = string.Empty,
                 Username = string.Empty,
@@ -76,18 +74,15 @@ public class GrpcAuthService : AuthService.AuthServiceBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during registration");
-            throw new RpcException(new Status(StatusCode.Internal, "Internal server error"));
+            throw;
         }
     }
 
-    /// <summary>
-    /// Вход пользователя через gRPC
-    /// </summary>
-    public override async Task<AuthResponseProto> Login(LoginRequestProto request, ServerCallContext context)
+    public async Task<AuthResponse> Login(LoginRequest request, CallContext context = default)
     {
         try
         {
-            var serverInfo = $"[Server Port: {context.Host}]";
+            var serverInfo = $"[Code-First Server]";
             _logger.LogInformation("{ServerInfo} gRPC Login request for username: {Username}", serverInfo, request.Username);
 
             var contractRequest = new Contracts.Requests.LoginRequest
@@ -100,7 +95,7 @@ public class GrpcAuthService : AuthService.AuthServiceBase
 
             if (authResponse == null)
             {
-                return new AuthResponseProto
+                return new AuthResponse
                 {
                     Token = string.Empty,
                     Username = string.Empty,
@@ -111,7 +106,7 @@ public class GrpcAuthService : AuthService.AuthServiceBase
 
             _logger.LogInformation("{ServerInfo} Login successful for: {Username}", serverInfo, request.Username);
 
-            return new AuthResponseProto
+            return new AuthResponse
             {
                 Token = authResponse.Token,
                 Username = authResponse.Username,
@@ -122,7 +117,7 @@ public class GrpcAuthService : AuthService.AuthServiceBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during login");
-            throw new RpcException(new Status(StatusCode.Internal, "Internal server error"));
+            throw;
         }
     }
 }

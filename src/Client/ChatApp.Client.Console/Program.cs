@@ -18,7 +18,7 @@ WriteLine();
 // Выбор протокола
 WriteLine("Выберите протокол:");
 WriteLine("1. HTTP (REST API)");
-WriteLine("2. gRPC");
+WriteLine("2. gRPC (Code-first)");
 Write("Выбор (по умолчанию 1): ");
 String? protocolChoice = ReadLine();
 bool useGrpc = protocolChoice == "2";
@@ -30,12 +30,12 @@ if (String.IsNullOrWhiteSpace(serverUrl))
     serverUrl = useGrpc ? "http://localhost:5097" : "http://localhost:5096";
 
 WriteLine();
-WriteLine($"Подключение к серверу {serverUrl} через {(useGrpc ? "gRPC" : "HTTP")}...");
+WriteLine($"Подключение к серверу {serverUrl} через {(useGrpc ? "gRPC (Code-first)" : "HTTP")}...");
 WriteLine();
 
 // Создаём клиент в зависимости от выбранного протокола
-IChatApiClient apiClient = useGrpc 
-    ? new GrpcChatApiClient(serverUrl) 
+IChatApiClient apiClient = useGrpc
+    ? new CodeFirstGrpcChatApiClient(serverUrl)
     : new HttpChatApiClient(serverUrl);
 
 using var cts = new CancellationTokenSource();

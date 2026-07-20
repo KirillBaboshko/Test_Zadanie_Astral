@@ -2,21 +2,22 @@ using ChatApp.Client.Application.Services;
 using ChatApp.Contracts.Messages;
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
-using ChatApp.Shared.Grpc;
-using Grpc.Core;
+using ChatApp.Shared.Grpc.Contracts;
 using Grpc.Net.Client;
+using ProtoBuf.Grpc.Client;
 
 namespace ChatApp.Client.Infrastructure.Grpc;
 
-public class GrpcChatApiClient : IChatApiClient
+
+public class CodeFirstGrpcChatApiClient : IChatApiClient
 {
     private readonly GrpcChannel _channel;
-    private readonly AuthService.AuthServiceClient _authClient;
-    private readonly ChatService.ChatServiceClient _chatClient;
+    private readonly IAuthService _authClient;
+    private readonly IChatService _chatClient;
     private readonly String _baseUrl;
     private String? _authToken;
 
-    public GrpcChatApiClient(String baseUrl)
+    public CodeFirstGrpcChatApiClient(String baseUrl)
     {
         _baseUrl = baseUrl;
         const Int32 delay = 60;
@@ -35,8 +36,10 @@ public class GrpcChatApiClient : IChatApiClient
         };
 
         _channel = GrpcChannel.ForAddress(baseUrl, channelOptions);
-        _authClient = new AuthService.AuthServiceClient(_channel);
-        _chatClient = new ChatService.ChatServiceClient(_channel);
+        
+        // Code-first клиенты создаются через ProtoBuf.Grpc
+        _authClient = _channel.CreateGrpcService<IAuthService>();
+        _chatClient = _channel.CreateGrpcService<IChatService>();
     }
 
     /// <summary>
@@ -56,38 +59,34 @@ public class GrpcChatApiClient : IChatApiClient
     }
 
     /// <summary>
-    /// Регистрация через gRPC
+    /// Регистрация через code-first gRPC
     /// </summary>
-    public async Task<AuthResponse?> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<Contracts.Responses.AuthResponse?> RegisterAsync(Contracts.Requests.RegisterRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var grpcRequest = new RegisterRequestProto
+            var grpcRequest = new Shared.Grpc.Contracts.RegisterRequest
             {
                 Username = request.Username,
                 Password = request.Password
             };
 
-            var response = await _authClient.RegisterAsync(grpcRequest, cancellationToken: cancellationToken);
+            var response = await _authClient.Register(grpcRequest);
 
             if (!string.IsNullOrEmpty(response.Error))
             {
                 Console.WriteLine($"Ошибка регистрации: {response.Error}");
                 return null;
             }
+            
             SetAuthToken(response.Token);
 
-            return new AuthResponse
+            return new Contracts.Responses.AuthResponse
             {
                 Token = response.Token,
                 Username = response.Username,
                 ExpiresAt = DateTimeOffset.FromUnixTimeMilliseconds(response.ExpiresAt).UtcDateTime
             };
-        }
-        catch (RpcException ex)
-        {
-            Console.WriteLine($"gRPC ошибка при регистрации: {ex.Status.Detail}");
-            return null;
         }
         catch (Exception ex)
         {
@@ -97,19 +96,19 @@ public class GrpcChatApiClient : IChatApiClient
     }
 
     /// <summary>
-    /// Вход через gRPC
+    /// Вход через code-first gRPC
     /// </summary>
-    public async Task<AuthResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    public async Task<Contracts.Responses.AuthResponse?> LoginAsync(Contracts.Requests.LoginRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var grpcRequest = new LoginRequestProto
+            var grpcRequest = new Shared.Grpc.Contracts.LoginRequest
             {
                 Username = request.Username,
                 Password = request.Password
             };
 
-            var response = await _authClient.LoginAsync(grpcRequest, cancellationToken: cancellationToken);
+            var response = await _authClient.Login(grpcRequest);
 
             if (!string.IsNullOrEmpty(response.Error))
             {
@@ -119,17 +118,12 @@ public class GrpcChatApiClient : IChatApiClient
 
             SetAuthToken(response.Token);
 
-            return new AuthResponse
+            return new Contracts.Responses.AuthResponse
             {
                 Token = response.Token,
                 Username = response.Username,
                 ExpiresAt = DateTimeOffset.FromUnixTimeMilliseconds(response.ExpiresAt).UtcDateTime
             };
-        }
-        catch (RpcException ex)
-        {
-            Console.WriteLine($"gRPC ошибка при входе: {ex.Status.Detail}");
-            return null;
         }
         catch (Exception ex)
         {
@@ -139,7 +133,7 @@ public class GrpcChatApiClient : IChatApiClient
     }
 
     /// <summary>
-    /// Отправка сообщения через gRPC
+    /// Отправка сообщения через code-first gRPC
     /// </summary>
     public async Task<ChatMessageDto?> SendMessageAsync(SendMessageAuthRequest request, CancellationToken cancellationToken = default)
     {
@@ -151,13 +145,13 @@ public class GrpcChatApiClient : IChatApiClient
                 return null;
             }
 
-            var grpcRequest = new SendMessageRequest
+            var grpcRequest = new Shared.Grpc.Contracts.SendMessageRequest
             {
                 Token = _authToken,
                 Content = request.Content
             };
 
-            var response = await _chatClient.SendMessageAsync(grpcRequest, cancellationToken: cancellationToken);
+            var response = await _chatClient.SendMessage(grpcRequest);
 
             return new ChatMessageDto
             {
@@ -167,14 +161,9 @@ public class GrpcChatApiClient : IChatApiClient
                 Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(response.Timestamp).UtcDateTime
             };
         }
-        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unauthenticated)
+        catch (UnauthorizedAccessException)
         {
             Console.WriteLine("Токен истёк или невалиден");
-            return null;
-        }
-        catch (RpcException ex)
-        {
-            Console.WriteLine($"gRPC ошибка при отправке сообщения: {ex.Status.Detail}");
             return null;
         }
         catch (Exception ex)
@@ -185,13 +174,13 @@ public class GrpcChatApiClient : IChatApiClient
     }
 
     /// <summary>
-    /// Получение сообщений через gRPC
+    /// Получение сообщений через code-first gRPC
     /// </summary>
     public async Task<GetMessagesResponse?> GetMessagesAsync(DateTime? since = null, Int32 limit = 100, CancellationToken cancellationToken = default)
     {
         try
         {
-            var grpcRequest = new GetMessagesRequest
+            var grpcRequest = new Shared.Grpc.Contracts.GetMessagesRequest
             {
                 SinceTimestamp = since.HasValue 
                     ? new DateTimeOffset(since.Value).ToUnixTimeMilliseconds() 
@@ -199,7 +188,7 @@ public class GrpcChatApiClient : IChatApiClient
                 Limit = limit
             };
 
-            var response = await _chatClient.GetMessagesAsync(grpcRequest, cancellationToken: cancellationToken);
+            var response = await _chatClient.GetMessages(grpcRequest);
 
             var messages = response.Messages.Select(m => new ChatMessageDto
             {
@@ -215,11 +204,6 @@ public class GrpcChatApiClient : IChatApiClient
                 TotalCount = response.TotalCount
             };
         }
-        catch (RpcException ex)
-        {
-            Console.WriteLine($"gRPC ошибка при получении сообщений: {ex.Status.Detail}");
-            return null;
-        }
         catch (Exception ex)
         {
             Console.WriteLine($"Ошибка при получении сообщений: {ex.Message}");
@@ -228,7 +212,7 @@ public class GrpcChatApiClient : IChatApiClient
     }
 
     /// <summary>
-    /// Получение сообщений пользователя через gRPC
+    /// Получение сообщений пользователя через code-first gRPC
     /// </summary>
     public async Task<GetMessagesResponse?> GetMessagesForNameAsync(Int32 limit = 100, String? senderName = null, CancellationToken cancellationToken = default)
     {
@@ -240,13 +224,13 @@ public class GrpcChatApiClient : IChatApiClient
                 return null;
             }
 
-            var grpcRequest = new GetMessagesByUserRequest
+            var grpcRequest = new Shared.Grpc.Contracts.GetMessagesByUserRequest
             {
                 Username = senderName,
                 Limit = limit
             };
 
-            var response = await _chatClient.GetMessagesByUserAsync(grpcRequest, cancellationToken: cancellationToken);
+            var response = await _chatClient.GetMessagesByUser(grpcRequest);
 
             var messages = response.Messages.Select(m => new ChatMessageDto
             {
@@ -262,14 +246,9 @@ public class GrpcChatApiClient : IChatApiClient
                 TotalCount = response.TotalCount
             };
         }
-        catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
+        catch (InvalidOperationException)
         {
             Console.WriteLine($"Пользователь {senderName} не найден");
-            return null;
-        }
-        catch (RpcException ex)
-        {
-            Console.WriteLine($"gRPC ошибка: {ex.Status.Detail}");
             return null;
         }
         catch (Exception ex)
@@ -280,7 +259,7 @@ public class GrpcChatApiClient : IChatApiClient
     }
 
     /// <summary>
-    /// Подписка на стрим новых сообщений через gRPC Server Streaming
+    /// Подписка на стрим новых сообщений через code-first gRPC Server Streaming
     /// </summary>
     public async Task StreamMessagesAsync(Action<ChatMessageDto> onNewMessage, CancellationToken cancellationToken)
     {
@@ -292,15 +271,15 @@ public class GrpcChatApiClient : IChatApiClient
                 return;
             }
 
-            var request = new StreamMessagesRequest
+            var request = new Shared.Grpc.Contracts.StreamMessagesRequest
             {
                 Token = _authToken,
                 SinceTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()
             };
 
-            using var streamingCall = _chatClient.StreamMessages(request, cancellationToken: cancellationToken);
+            var stream = _chatClient.StreamMessages(request);
 
-            await foreach (var message in streamingCall.ResponseStream.ReadAllAsync(cancellationToken))
+            await foreach (var message in stream.WithCancellation(cancellationToken))
             {
                 var dto = new ChatMessageDto
                 {
@@ -313,13 +292,9 @@ public class GrpcChatApiClient : IChatApiClient
                 onNewMessage(dto);
             }
         }
-        catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
+        catch (OperationCanceledException)
         {
             Console.WriteLine("Стрим сообщений отменён");
-        }
-        catch (RpcException ex)
-        {
-            Console.WriteLine($"gRPC ошибка стриминга: {ex.Status.Detail}");
         }
         catch (Exception ex)
         {
@@ -332,4 +307,3 @@ public class GrpcChatApiClient : IChatApiClient
         _channel?.Dispose();
     }
 }
-
