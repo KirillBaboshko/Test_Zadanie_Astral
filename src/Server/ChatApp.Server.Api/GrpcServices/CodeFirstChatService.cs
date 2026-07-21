@@ -1,4 +1,5 @@
 using ChatApp.Contracts.Requests;
+using ChatApp.Server.Application.Common;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUsers;
 using ChatApp.Server.Application.UseCases.SendMessage;
@@ -17,7 +18,7 @@ namespace ChatApp.Server.Api.GrpcServices;
 /// </summary>
 public class CodeFirstChatService : IChatService
 {
-    private readonly SendMessageUseCase _sendMessageUseCase;
+    private readonly IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> _sendMessageUseCase;
     private readonly GetMessagesUseCase _getMessagesUseCase;
     private readonly GetUsersUseCase _getUsersUseCase;
     private readonly RsaSecurityKey _rsaKey;
@@ -25,7 +26,7 @@ public class CodeFirstChatService : IChatService
     private readonly ILogger<CodeFirstChatService> _logger;
 
     public CodeFirstChatService(
-        SendMessageUseCase sendMessageUseCase,
+        IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> sendMessageUseCase,
         GetMessagesUseCase getMessagesUseCase,
         GetUsersUseCase getUsersUseCase,
         RsaSecurityKey rsaKey,
@@ -53,24 +54,27 @@ public class CodeFirstChatService : IChatService
 
             _logger.LogInformation("{ServerInfo} gRPC SendMessage request from user: {UserId}", serverInfo, userId);
 
-            var contractRequest = new SendMessageAuthRequest
+            // Создаем запрос для Use Case
+            var useCaseRequest = new SendMessageUseCaseRequest
             {
+                UserId = userId.Value,
                 Content = request.Content
             };
 
-            var message = await _sendMessageUseCase.ExecuteAuthAsync(userId.Value, contractRequest, context.CancellationToken);
+            // Выполняем Use Case с декораторами (Logging + UnitOfWork)
+            var response = await _sendMessageUseCase.ExecuteAsync(useCaseRequest, context.CancellationToken);
 
-            if (message == null)
+            if (!response.Success)
             {
                 throw new InvalidOperationException("User not found");
             }
 
             return new MessageResponse
             {
-                Id = message.Id.ToString(),
-                SenderName = message.SenderName,
-                Content = message.Content,
-                Timestamp = new DateTimeOffset(message.Timestamp).ToUnixTimeMilliseconds()
+                Id = response.MessageId.ToString(),
+                SenderName = response.SenderName,
+                Content = response.Content,
+                Timestamp = new DateTimeOffset(response.Timestamp).ToUnixTimeMilliseconds()
             };
         }
         catch (Exception ex)

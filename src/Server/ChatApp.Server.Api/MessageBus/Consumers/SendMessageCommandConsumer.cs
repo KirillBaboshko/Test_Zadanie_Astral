@@ -1,4 +1,4 @@
-using ChatApp.Contracts.Requests;
+using ChatApp.Server.Application.Common;
 using ChatApp.Server.Application.UseCases.SendMessage;
 using ChatApp.Shared.Messages.Commands;
 using MassTransit;
@@ -7,15 +7,15 @@ namespace ChatApp.Server.Api.MessageBus.Consumers;
 
 /// <summary>
 /// Consumer для обработки команды отправки сообщения
-/// Fire-and-forget паттерн: UseCase сам сохраняет сообщение и событие в Outbox
+/// Использует декорированный Use Case с Cross-Cutting Concerns
 /// </summary>
 public class SendMessageCommandConsumer : IConsumer<SendMessageCommand>
 {
-    private readonly SendMessageUseCase _sendMessageUseCase;
+    private readonly IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> _sendMessageUseCase;
     private readonly ILogger<SendMessageCommandConsumer> _logger;
 
     public SendMessageCommandConsumer(
-        SendMessageUseCase sendMessageUseCase,
+        IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> sendMessageUseCase,
         ILogger<SendMessageCommandConsumer> logger)
     {
         _sendMessageUseCase = sendMessageUseCase ?? throw new ArgumentNullException(nameof(sendMessageUseCase));
@@ -27,39 +27,37 @@ public class SendMessageCommandConsumer : IConsumer<SendMessageCommand>
         var command = context.Message;
         
         _logger.LogInformation(
-            "[RabbitMQ Command Consumer] Получена команда отправки сообщения: От={Username}, Контент={Content}",
-            command.Username,
-            command.Content.Length > 50 ? command.Content.Substring(0, 50) + "..." : command.Content);
+            "[RabbitMQ Consumer] Получена команда SendMessage от {Username}",
+            command.Username);
 
         try
         {
-            var request = new SendMessageAuthRequest
+            var request = new SendMessageUseCaseRequest
             {
+                UserId = command.UserId,
                 Content = command.Content
             };
 
-            var messageDto = await _sendMessageUseCase.ExecuteAuthAsync(
-                command.UserId, 
-                request, 
-                context.CancellationToken);
+            // Вызываем декорированный Use Case
+            // Автоматически применяются: Logging -> UnitOfWork -> Core Logic
+            var response = await _sendMessageUseCase.ExecuteAsync(request, context.CancellationToken);
 
-            if (messageDto == null)
+            if (!response.Success)
             {
                 _logger.LogWarning(
-                    "[RabbitMQ Command Consumer] Не удалось отправить сообщение: пользователь {UserId} не найден",
+                    "[RabbitMQ Consumer] Пользователь {UserId} не найден",
                     command.UserId);
                 return;
             }
 
             _logger.LogInformation(
-                "[RabbitMQ Command Consumer] Сообщение сохранено в БД и Outbox: Id={MessageId}, От={Username}",
-                messageDto.Id,
-                command.Username);
+                "[RabbitMQ Consumer] Сообщение обработано: Id={MessageId}",
+                response.MessageId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, 
-                "[RabbitMQ Command Consumer] Ошибка при отправке сообщения от {Username}",
+                "[RabbitMQ Consumer] Ошибка при обработке команды от {Username}",
                 command.Username);
         }
     }
