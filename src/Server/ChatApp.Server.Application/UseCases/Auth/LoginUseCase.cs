@@ -2,6 +2,8 @@ using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
 using ChatApp.Server.Domain.Repositories;
 using ChatApp.Server.Domain.Services;
+using ChatApp.Shared.Messages.Events;
+using MassTransit;
 
 namespace ChatApp.Server.Application.UseCases.Auth;
 
@@ -10,15 +12,18 @@ public sealed class LoginUseCase
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public LoginUseCase(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
-        IJwtTokenGenerator jwtTokenGenerator)
+        IJwtTokenGenerator jwtTokenGenerator,
+        IPublishEndpoint publishEndpoint)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _passwordHasher = passwordHasher ?? throw new ArgumentNullException(nameof(passwordHasher));
         _jwtTokenGenerator = jwtTokenGenerator ?? throw new ArgumentNullException(nameof(jwtTokenGenerator));
+        _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
     }
 
     /// <summary>
@@ -36,6 +41,14 @@ public sealed class LoginUseCase
 
         // Обновляем время последней активности (ChangeTracker автоматически отследит изменения)
         user.UpdateLastSeen();
+
+        // Публикуем событие входа в RabbitMQ
+        await _publishEndpoint.Publish(new UserLoggedInEvent
+        {
+            UserId = user.Id,
+            Username = user.Username,
+            LoggedInAt = DateTime.UtcNow
+        }, cancellationToken);
 
         // Генерируем JWT токен
         var token = _jwtTokenGenerator.GenerateToken(user.Id, user.Username);

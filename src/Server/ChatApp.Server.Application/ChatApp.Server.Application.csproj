@@ -3,10 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="..\ChatApp.Server.Domain\ChatApp.Server.Domain.csproj" />
     <ProjectReference Include="..\..\Shared\ChatApp.Contracts\ChatApp.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\ChatApp.Shared.Messages\ChatApp.Shared.Messages.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="MassTransit" Version="8.2.5" />
   </ItemGroup>
 
   <PropertyGroup>

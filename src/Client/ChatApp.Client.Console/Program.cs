@@ -2,8 +2,12 @@
 using ChatApp.Client.Application.Services;
 using ChatApp.Client.Infrastructure.Grpc;
 using ChatApp.Client.Infrastructure.Http;
+using ChatApp.Client.Infrastructure.MessageBus;
+using ChatApp.Client.Infrastructure.MessageBus.Consumers;
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
+using ChatApp.Shared.Messages.Commands;
+using MassTransit;
 using static System.Console;
 
 // Включаем HTTP/2 без TLS для gRPC (необходимо для Windows в dev режиме)
@@ -19,25 +23,18 @@ WriteLine();
 WriteLine("Выберите протокол:");
 WriteLine("1. HTTP (REST API)");
 WriteLine("2. gRPC (Code-first)");
+WriteLine("3. Message Bus (Async RabbitMQ)");
 Write("Выбор (по умолчанию 1): ");
 String? protocolChoice = ReadLine();
 bool useGrpc = protocolChoice == "2";
+bool useMessageBus = protocolChoice == "3";
 
 WriteLine();
-Write($"URL сервера (по умолчанию {(useGrpc ? "http://localhost:5097" : "http://localhost:5096")}): ");
-String? serverUrl = ReadLine();
-if (String.IsNullOrWhiteSpace(serverUrl))
-    serverUrl = useGrpc ? "http://localhost:5097" : "http://localhost:5096";
 
-WriteLine();
-WriteLine($"Подключение к серверу {serverUrl} через {(useGrpc ? "gRPC (Code-first)" : "HTTP")}...");
-WriteLine();
+IChatApiClient? apiClient = null;
+IBusControl? busControl = null;
 
-// Создаём клиент в зависимости от выбранного протокола
-IChatApiClient apiClient = useGrpc
-    ? new CodeFirstGrpcChatApiClient(serverUrl)
-    : new HttpChatApiClient(serverUrl);
-
+// CancellationToken для контроля жизненного цикла приложения
 using var cts = new CancellationTokenSource();
 
 CancelKeyPress += (_, e) =>
@@ -45,6 +42,105 @@ CancelKeyPress += (_, e) =>
     e.Cancel = true;
     cts.Cancel();
 };
+
+if (useMessageBus)
+{
+    // Настройка Message Bus клиента
+    Write("URL RabbitMQ (по умолчанию localhost): ");
+    String? rabbitHost = ReadLine();
+    if (String.IsNullOrWhiteSpace(rabbitHost))
+        rabbitHost = "localhost";
+    
+    WriteLine($"Подключение к RabbitMQ {rabbitHost}...");
+    
+    try
+    {
+        busControl = Bus.Factory.CreateUsingRabbitMq(cfg =>
+        {
+            cfg.Host(rabbitHost, h =>
+            {
+                h.Username("guest");
+                h.Password("guest");
+                
+                // Настройки таймаутов для быстрого подключения
+                h.RequestedConnectionTimeout(TimeSpan.FromSeconds(5));
+            });
+            
+            cfg.ReceiveEndpoint($"client-messages-{Guid.NewGuid():N}", e =>
+            {
+                e.Consumer<MessageSentEventConsumer>();
+                e.PrefetchCount = 16;
+                e.UseConcurrencyLimit(2);
+                e.AutoDelete = true;
+                e.Durable = false;
+            });
+            
+            cfg.ReceiveEndpoint($"client-users-{Guid.NewGuid():N}", e =>
+            {
+                e.Consumer<UserRegisteredEventConsumer>();
+                
+                e.PrefetchCount = 16;
+                e.UseConcurrencyLimit(2);
+                e.AutoDelete = true;
+                e.Durable = false;
+            });
+        });
+        
+        WriteLine("Запуск подключения к RabbitMQ...");
+        
+        var startTask = busControl.StartAsync(cts.Token);
+        if (await Task.WhenAny(startTask, Task.Delay(10000, cts.Token)) == startTask)
+        {
+            await startTask; 
+            WriteLine("[OK] Подключено к RabbitMQ");
+        }
+        else
+        {
+            WriteLine("[ОШИБКА] Таймаут подключения к RabbitMQ");
+            WriteLine("Проверьте что RabbitMQ запущен: .\\start-rabbitmq.ps1");
+            return 1;
+        }
+    }
+    catch (Exception ex)
+    {
+        WriteLine($"[ОШИБКА] Не удалось подключиться к RabbitMQ: {ex.Message}");
+        WriteLine("Проверьте что:");
+        WriteLine("1. Docker Desktop запущен");
+        WriteLine("2. RabbitMQ контейнер запущен: .\\start-rabbitmq.ps1");
+        WriteLine("3. Порт 5672 доступен");
+        return 1;
+    }
+    
+    WriteLine();
+    
+    // Создаём Message Bus клиент с Request Client для синхронных запросов
+    // Указываем явные адреса endpoint'ов, которые созданы ConfigureEndpoints на сервере
+    var timeout = RequestTimeout.After(s: 30);
+    var registerClient = busControl.CreateRequestClient<RegisterUserCommand>(
+        new Uri("queue:RegisterUserCommand"), 
+        timeout);
+    var loginClient = busControl.CreateRequestClient<LoginUserCommand>(
+        new Uri("queue:LoginUserCommand"), 
+        timeout);
+    
+    apiClient = new MessageBusApiClient(busControl, registerClient, loginClient);
+}
+else
+{
+    Write($"URL сервера (по умолчанию {(useGrpc ? "http://localhost:5097" : "http://localhost:5096")}): ");
+    String? serverUrl = ReadLine();
+    if (String.IsNullOrWhiteSpace(serverUrl))
+        serverUrl = useGrpc ? "http://localhost:5097" : "http://localhost:5096";
+
+    WriteLine();
+    WriteLine($"Подключение к серверу {serverUrl} через {(useGrpc ? "gRPC (Code-first)" : "HTTP")}...");
+    WriteLine();
+
+    // Создаём клиент в зависимости от выбранного протокола
+    apiClient = useGrpc
+        ? new CodeFirstGrpcChatApiClient(serverUrl)
+        : new HttpChatApiClient(serverUrl);
+}
 
 AuthResponse? authResponse = null;
 String? currentUsername = null;
@@ -273,6 +369,21 @@ try
 }
 catch (OperationCanceledException)
 {
+}
+
+// Остановка Message Bus если использовался
+if (busControl != null)
+{
+    WriteLine("Отключение от RabbitMQ...");
+    try
+    {
+        await busControl.StopAsync(TimeSpan.FromSeconds(5));
+        WriteLine("Отключено от RabbitMQ");
+    }
+    catch (Exception ex)
+    {
+        WriteLine($"Ошибка при отключении: {ex.Message}");
+    }
 }
 
 WriteLine("Отключено от сервера. До свидания!");

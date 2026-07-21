@@ -4,6 +4,12 @@
     <ProjectReference Include="..\ChatApp.Client.Application\ChatApp.Client.Application.csproj" />
     <ProjectReference Include="..\ChatApp.Client.Infrastructure\ChatApp.Client.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Shared\ChatApp.Contracts\ChatApp.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\ChatApp.Shared.Messages\ChatApp.Shared.Messages.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit" Version="8.2.5" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.2.5" />
   </ItemGroup>
 
   <PropertyGroup>

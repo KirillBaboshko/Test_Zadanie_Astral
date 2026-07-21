@@ -9,6 +9,8 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
+    <PackageReference Include="MassTransit" Version="8.2.5" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.2.5" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -23,6 +25,7 @@
     <ProjectReference Include="..\ChatApp.Server.Infrastructure\ChatApp.Server.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Shared\ChatApp.Contracts\ChatApp.Contracts.csproj" />
     <ProjectReference Include="..\..\Shared\ChatApp.Shared.Protos\ChatApp.Shared.Protos.csproj" />
+    <ProjectReference Include="..\..\Shared\ChatApp.Shared.Messages\ChatApp.Shared.Messages.csproj" />
   </ItemGroup>
 
 </Project>

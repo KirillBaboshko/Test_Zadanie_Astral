@@ -22,6 +22,26 @@ services:
     networks:
       - chatapp-network
 
+  # RabbitMQ message broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: chatapp-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # AMQP протокол
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - chatapp-network
+
   # Server API
   server:
     build:
@@ -32,12 +52,17 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=chatapp;Username=postgres;Password=postgres
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
       - Jwt__Issuer=ChatApp
       - Jwt__Audience=ChatApp.Client
     ports:
       - "5096:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - chatapp-network
@@ -61,6 +86,8 @@ services:
 volumes:
   postgres_data:
     name: chatapp-postgres-data
+  rabbitmq_data:
+    name: chatapp-rabbitmq-data
 
 networks:
   chatapp-network:

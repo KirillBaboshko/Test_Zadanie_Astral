@@ -6,23 +6,153 @@ Shared солюшен содержит контракты и DTO, использ
 
 ```
 Shared/
-└── ChatApp.Contracts/    # Контракты, DTO, запросы и ответы
-    ├── Messages/         # DTO для сообщений
-    ├── Requests/         # Модели запросов
-    └── Responses/        # Модели ответов
+├── ChatApp.Contracts/      # Контракты, DTO, запросы и ответы
+│   ├── Messages/           # DTO для сообщений
+│   ├── Requests/           # Модели запросов
+│   └── Responses/          # Модели ответов
+├── ChatApp.Shared.Protos/  # gRPC Code-first контракты
+│   └── Contracts/          # Интерфейсы и модели для gRPC
+└── ChatApp.Shared.Messages/ # Message Bus события
+    └── Events/             # События для RabbitMQ
 ```
 
 ---
 
 ## 🎯 ChatApp.Contracts
 
-**Назначение:** Общие контракты для коммуникации между клиентом и сервером.
+**Назначение:** Общие контракты для HTTP REST API коммуникации между клиентом и сервером.
 
 ### Принципы:
 - ✅ Независимость от реализации
 - ✅ Простые POCO объекты
-- ✅ Единая точка истины для API контрактов
+- ✅ Единая точка истины для REST API контрактов
 - ✅ Версионирование через namespace
+
+---
+
+## 🎯 ChatApp.Shared.Protos
+
+**Назначение:** gRPC Code-first контракты для RPC коммуникации.
+
+**Технологии:**
+- protobuf-net.Grpc - Code-first подход без .proto файлов
+- ServiceContract и OperationContract атрибуты
+- DataContract для моделей данных
+
+### Контракты:
+
+#### IAuthService
+```csharp
+[ServiceContract]
+public interface IAuthService
+{
+    [OperationContract]
+    Task<AuthResponse> Register(RegisterRequest request);
+    
+    [OperationContract]
+    Task<AuthResponse> Login(LoginRequest request);
+}
+```
+
+#### IChatService
+```csharp
+[ServiceContract]
+public interface IChatService
+{
+    [OperationContract]
+    Task<SendMessageResponse> SendMessage(SendMessageRequest request);
+    
+    [OperationContract]
+    IAsyncEnumerable<MessageResponse> StreamMessages();
+    
+    [OperationContract]
+    Task<GetMessagesResponse> GetMessages(GetMessagesRequest request);
+}
+```
+
+**Преимущества Code-first:**
+- Нет необходимости в .proto файлах
+- Использование C# типов и атрибутов
+- Автоматическая сериализация protobuf
+- Совместимость с стандартным gRPC
+
+---
+
+## 🎯 ChatApp.Shared.Messages
+
+**Назначение:** Контракты событий для асинхронной коммуникации через message bus (MassTransit + RabbitMQ).
+
+### События:
+
+#### UserRegisteredEvent
+```csharp
+/// <summary>
+/// Событие: пользователь зарегистрирован
+/// Публикуется когда новый пользователь успешно регистрируется в системе
+/// </summary>
+public record UserRegisteredEvent
+{
+    public Guid UserId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public DateTime RegisteredAt { get; init; }
+}
+```
+
+**Когда публикуется:** После успешной регистрации нового пользователя  
+**Обработчики:** `UserRegisteredConsumer` - welcome действия, отправка приветственных сообщений
+
+#### UserLoggedInEvent
+```csharp
+/// <summary>
+/// Событие: пользователь вошёл в систему
+/// Публикуется когда пользователь успешно авторизуется
+/// </summary>
+public record UserLoggedInEvent
+{
+    public Guid UserId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public DateTime LoggedInAt { get; init; }
+}
+```
+
+**Когда публикуется:** После успешной авторизации пользователя  
+**Обработчики:** `UserLoggedInConsumer` - логирование входов, отслеживание активности
+
+#### MessageSentEvent
+```csharp
+/// <summary>
+/// Событие: сообщение отправлено
+/// Публикуется когда пользователь отправляет сообщение в чат
+/// </summary>
+public record MessageSentEvent
+{
+    public Guid MessageId { get; init; }
+    public Guid SenderId { get; init; }
+    public string SenderName { get; init; } = string.Empty;
+    public string Content { get; init; } = string.Empty;
+    public DateTime Timestamp { get; init; }
+}
+```
+
+**Когда публикуется:** После успешной отправки сообщения  
+**Обработчики:** `MessageSentConsumer` - аналитика, уведомления, модерация контента
+
+### Архитектура Event-Driven:
+
+```
+┌──────────┐                    ┌──────────────┐                    ┌──────────┐
+│  UseCase │ ──Publish Event──> │   RabbitMQ   │ ──Deliver Event──> │ Consumer │
+└──────────┘                    └──────────────┘                    └──────────┘
+     │                                                                     │
+     │                                                                     │
+  Сохраняет                                                          Обрабатывает
+  в БД (sync)                                                       асинхронно
+```
+
+**Готовность к Transactional Outbox:**
+- Publisher на стороне сервера с доступом к БД
+- События публикуются после успешного сохранения в БД
+- В будущем можно добавить Outbox таблицу для гарантированной доставки
 
 ---
 

@@ -1,5 +1,6 @@
 using ChatApp.Server.Api.BackgroundServices;
 using ChatApp.Server.Api.GrpcServices;
+using ChatApp.Server.Api.MessageBus.Consumers;
 using ChatApp.Server.Application.UseCases.Auth;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUserInfo;
@@ -8,6 +9,7 @@ using ChatApp.Server.Application.UseCases.SendMessage;
 using ChatApp.Server.Infrastructure;
 using ChatApp.Server.Infrastructure.Data;
 using FluentValidation;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -80,8 +82,41 @@ builder.Services.AddScoped<GetMessagesUseCase>();
 builder.Services.AddScoped<GetUsersUseCase>();
 builder.Services.AddScoped<GetUserInfoUseCase>();
 
+builder.Services.AddScoped<ChatApp.Server.Application.Services.IOutboxService, ChatApp.Server.Infrastructure.Services.OutboxService>();
+
+
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<MessageSentConsumer>();
+    x.AddConsumer<UserRegisteredConsumer>();
+    x.AddConsumer<UserLoggedInConsumer>();
+    
+    x.AddConsumer<RegisterUserCommandConsumer>();
+    x.AddConsumer<LoginUserCommandConsumer>();
+    x.AddConsumer<SendMessageCommandConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        var rabbitHost = builder.Configuration.GetValue<string>("RabbitMQ:Host") ?? "localhost";
+        var rabbitUser = builder.Configuration.GetValue<string>("RabbitMQ:Username") ?? "guest";
+        var rabbitPass = builder.Configuration.GetValue<string>("RabbitMQ:Password") ?? "guest";
+
+        cfg.Host(rabbitHost, h =>
+        {
+            h.Username(rabbitUser);
+            h.Password(rabbitPass);
+        });
+
+        // Автоматическая настройка endpoints для consumers
+        cfg.ConfigureEndpoints(context);
+    });
+});
+
+Console.WriteLine($"[MassTransit] Configured with RabbitMQ (Events + Commands)");
+
 
 builder.Services.AddHostedService<MessageCleanupService>();
+builder.Services.AddHostedService<OutboxPublisherService>();
 
 builder.Services.AddCors(options =>
 {
