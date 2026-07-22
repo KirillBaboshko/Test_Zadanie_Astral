@@ -83,6 +83,20 @@ services:
     profiles:
       - client
 
+  # Blazor WebAssembly клиент (nginx)
+  blazor-client:
+    build:
+      context: .
+      dockerfile: src/Client/ChatApp.Client.Blazor/Dockerfile
+    container_name: chatapp-blazor-client
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+    networks:
+      - chatapp-network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     name: chatapp-postgres-data
