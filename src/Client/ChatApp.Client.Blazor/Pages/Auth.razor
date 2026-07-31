@@ -1,0 +1,75 @@
+@page "/"
+@page "/auth"
+@using ChatApp.Client.Blazor.ViewModels
+@inject AuthViewModel ViewModel
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h2>@(ViewModel.IsLoginMode ? "Вход" : "Регистрация")</h2>
+
+        @if (!string.IsNullOrEmpty(ViewModel.Message))
+        {
+            <div class="alert @(ViewModel.IsError ? "alert-error" : "alert-success")">
+                @ViewModel.Message
+            </div>
+        }
+
+        <div class="form-group">
+            <label>Имя пользователя:</label>
+            <input type="text" 
+                   @bind="ViewModel.Username" 
+                   class="form-control" 
+                   placeholder="Введите имя пользователя"
+                   disabled="@ViewModel.IsLoading" />
+        </div>
+
+        <div class="form-group">
+            <label>Пароль:</label>
+            <input type="password" 
+                   @bind="ViewModel.Password" 
+                   class="form-control" 
+                   placeholder="Введите пароль"
+                   disabled="@ViewModel.IsLoading" />
+        </div>
+
+        <div class="button-group">
+            @if (ViewModel.IsLoginMode)
+            {
+                <button class="btn btn-primary" @onclick="LoginAsync" disabled="@ViewModel.IsLoading">
+                    @(ViewModel.IsLoading ? "Загрузка..." : "Войти")
+                </button>
+                <button class="btn btn-secondary" @onclick="ViewModel.SwitchToRegister" disabled="@ViewModel.IsLoading">
+                    Регистрация
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-primary" @onclick="RegisterAsync" disabled="@ViewModel.IsLoading">
+                    @(ViewModel.IsLoading ? "Загрузка..." : "Зарегистрироваться")
+                </button>
+                <button class="btn btn-secondary" @onclick="ViewModel.SwitchToLogin" disabled="@ViewModel.IsLoading">
+                    Уже есть аккаунт
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await ViewModel.InitializeAsync();
+    }
+
+    private async Task LoginAsync()
+    {
+        await ViewModel.LoginAsync();
+        StateHasChanged();
+    }
+
+    private async Task RegisterAsync()
+    {
+        await ViewModel.RegisterAsync();
+        StateHasChanged();
+    }
+}

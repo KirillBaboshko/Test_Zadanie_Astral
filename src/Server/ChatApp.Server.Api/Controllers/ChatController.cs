@@ -1,6 +1,7 @@
 using ChatApp.Contracts.Messages;
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
+using ChatApp.Server.Application.Common;
 using ChatApp.Server.Application.UseCases.GetMessages;
 using ChatApp.Server.Application.UseCases.GetUserInfo;
 using ChatApp.Server.Application.UseCases.GetUsers;
@@ -18,14 +19,14 @@ namespace ChatApp.Server.Api.Controllers;
 [Produces("application/json")]
 public class ChatController : ControllerBase
 {
-    private readonly SendMessageUseCase _sendMessageUseCase;
+    private readonly IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> _sendMessageUseCase;
     private readonly GetMessagesUseCase _getMessagesUseCase;
     private readonly GetUsersUseCase _getUsersUseCase;
     private readonly GetUserInfoUseCase _getUserInfoUseCase;
     private readonly IValidator<SendMessageAuthRequest> _sendMessageAuthValidator;
 
     public ChatController(
-        SendMessageUseCase sendMessageUseCase,
+        IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> sendMessageUseCase,
         GetMessagesUseCase getMessagesUseCase,
         GetUsersUseCase getUsersUseCase,
         GetUserInfoUseCase getUserInfoUseCase,
@@ -64,12 +65,29 @@ public class ChatController : ControllerBase
             return Unauthorized(new { error = "Не удалось определить пользователя из токена" });
         }
 
-        var message = await _sendMessageUseCase.ExecuteAuthAsync(userId, request, cancellationToken);
+        // Создаем запрос для Use Case
+        var useCaseRequest = new SendMessageUseCaseRequest
+        {
+            UserId = userId,
+            Content = request.Content
+        };
 
-        if (message == null)
+        // Выполняем Use Case с декораторами (Logging + UnitOfWork)
+        var response = await _sendMessageUseCase.ExecuteAsync(useCaseRequest, cancellationToken);
+
+        if (!response.Success)
             return NotFound(new { error = "Пользователь не найден" });
 
-        return CreatedAtAction(nameof(GetMessages), new { since = message.Timestamp }, message);
+        // Формируем DTO для ответа
+        var messageDto = new ChatMessageDto
+        {
+            Id = response.MessageId,
+            SenderName = response.SenderName,
+            Content = response.Content,
+            Timestamp = response.Timestamp
+        };
+
+        return CreatedAtAction(nameof(GetMessages), new { since = messageDto.Timestamp }, messageDto);
     }
 
     [HttpGet("messages")]

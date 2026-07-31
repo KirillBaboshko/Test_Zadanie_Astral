@@ -1,0 +1,81 @@
+@page "/chat"
+@using ChatApp.Client.Blazor.ViewModels
+@inject ChatViewModel ViewModel
+@implements IDisposable
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>Чат - @ViewModel.Username</h2>
+        <button class="btn btn-logout" @onclick="LogoutAsync">Выйти</button>
+    </div>
+
+    <div class="chat-messages" @ref="messagesContainer">
+        @if (ViewModel.Messages.Count == 0)
+        {
+            <div class="no-messages">Нет сообщений. Отправьте первое!</div>
+        }
+        else
+        {
+            @foreach (var msg in ViewModel.Messages)
+            {
+                <div class="message @(msg.SenderName == ViewModel.Username ? "message-own" : "message-other")">
+                    <div class="message-header">
+                        <strong>@msg.SenderName</strong>
+                        <span class="message-time">@msg.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
+                    </div>
+                    <div class="message-content">@msg.Content</div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="chat-input">
+        <input type="text" 
+               @bind="ViewModel.MessageText" 
+               @bind:event="oninput"
+               @onkeydown="HandleKeyDownAsync"
+               class="form-control" 
+               placeholder="Введите сообщение..."
+               disabled="@ViewModel.IsSending" />
+        <button class="btn btn-send" @onclick="SendMessageAsync" disabled="@ViewModel.IsSending">
+            @(ViewModel.IsSending ? "..." : "Отправить")
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ViewModel.ErrorMessage))
+    {
+        <div class="alert alert-error">@ViewModel.ErrorMessage</div>
+    }
+</div>
+
+@code {
+    private ElementReference messagesContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+        ViewModel.OnStateChanged += () => InvokeAsync(StateHasChanged);
+        
+        await ViewModel.InitializeAsync();
+    }
+
+    private async Task SendMessageAsync()
+    {
+        await ViewModel.SendMessageAsync();
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        await ViewModel.HandleKeyDownAsync(e.Key, e.ShiftKey);
+    }
+
+    private async Task LogoutAsync()
+    {
+        await ViewModel.LogoutAsync();
+    }
+
+    public void Dispose()
+    {
+        ViewModel.Dispose();
+    }
+}

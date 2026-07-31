@@ -1,19 +1,16 @@
-using ChatApp.Contracts.Messages;
-using ChatApp.Contracts.Requests;
 using ChatApp.Server.Application.Common;
+using ChatApp.Server.Application.Common.CrossCutting;
 using ChatApp.Server.Application.Services;
-using ChatApp.Server.Domain.Abstractions;
-using ChatApp.Server.Domain.Entities;
 using ChatApp.Server.Domain.Repositories;
 using ChatApp.Shared.Messages.Events;
 
 namespace ChatApp.Server.Application.UseCases.SendMessage;
 
 /// <summary>
-/// Use case для отправки сообщений
-/// Использует Outbox для надежной публикации событий
+/// Use Case для отправки сообщений с применением Cross-Cutting Concerns
+/// Декораторы: Logging -> UnitOfWork -> Core Logic
 /// </summary>
-public sealed class SendMessageUseCase : UseCaseBase
+public sealed class SendMessageUseCase : DecoratedUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse>
 {
     private readonly IUserRepository _userRepository;
     private readonly IOutboxService _outboxService;
@@ -21,46 +18,53 @@ public sealed class SendMessageUseCase : UseCaseBase
     public SendMessageUseCase(
         IUserRepository userRepository,
         IOutboxService outboxService,
-        IUnitOfWork unitOfWork) : base(unitOfWork)
+        IEnumerable<IUseCaseDecorator<SendMessageUseCaseRequest, SendMessageUseCaseResponse>> decorators)
+        : base(decorators)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _outboxService = outboxService ?? throw new ArgumentNullException(nameof(outboxService));
     }
 
     /// <summary>
-    /// Отправляет новое сообщение от авторизованного пользователя (по userId из JWT)
-    /// Сохраняет сообщение и событие в одной транзакции через Outbox
+    /// Основная бизнес-логика отправки сообщения
+    /// Выполняется внутри транзакции и с логированием (через декораторы)
     /// </summary>
-    public async Task<ChatMessageDto?> ExecuteAuthAsync(Guid userId, SendMessageAuthRequest request, CancellationToken cancellationToken = default)
+    protected override async Task<SendMessageUseCaseResponse> ExecuteCoreAsync(
+        SendMessageUseCaseRequest request,
+        CancellationToken cancellationToken)
     {
-        return await ExecuteWithUnitOfWorkAsync(async ct =>
+        // Находим пользователя
+        var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+
+        if (user == null)
         {
-            var user = await _userRepository.GetByIdAsync(userId, ct);
-            
-            if (user == null)
-                return null;
-
-            user.UpdateLastSeen();
-            var message = user.AddMessage(request.Content);
-
-            // Добавляем событие в Outbox в той же транзакции
-            // Событие будет опубликовано OutboxPublisherService
-            await _outboxService.AddEventAsync(new MessageSentEvent
+            return new SendMessageUseCaseResponse
             {
-                MessageId = message.Id,
-                SenderId = user.Id,
-                SenderName = user.Username,
-                Content = message.Content,
-                Timestamp = message.Timestamp
-            }, ct);
-
-            return new ChatMessageDto
-            {
-                Id = message.Id,
-                SenderName = user.Username,
-                Content = message.Content,
-                Timestamp = message.Timestamp
+                Success = false
             };
+        }
+
+        // Добавляем сообщение
+        user.UpdateLastSeen();
+        var message = user.AddMessage(request.Content);
+
+        // Добавляем событие в Outbox (в той же транзакции)
+        await _outboxService.AddEventAsync(new MessageSentEvent
+        {
+            MessageId = message.Id,
+            SenderId = user.Id,
+            SenderName = user.Username,
+            Content = message.Content,
+            Timestamp = message.Timestamp
         }, cancellationToken);
+
+        return new SendMessageUseCaseResponse
+        {
+            MessageId = message.Id,
+            SenderName = user.Username,
+            Content = message.Content,
+            Timestamp = message.Timestamp,
+            Success = true
+        };
     }
 }

@@ -2,6 +2,7 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Client/">
     <Project Path="src/Client/ChatApp.Client.Application/ChatApp.Client.Application.csproj" />
+    <Project Path="src/Client/ChatApp.Client.Blazor/ChatApp.Client.Blazor.csproj" />
     <Project Path="src/Client/ChatApp.Client.Console/ChatApp.Client.Console.csproj" />
     <Project Path="src/Client/ChatApp.Client.Infrastructure/ChatApp.Client.Infrastructure.csproj" />
   </Folder>
