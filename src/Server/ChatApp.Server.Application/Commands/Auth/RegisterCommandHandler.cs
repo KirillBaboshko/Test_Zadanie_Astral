@@ -27,7 +27,6 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
 
     public async Task<RegisterResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
-        // Проверка уникальности username
         var existingUser = await _userRepository.GetByUsernameAsync(request.Username, cancellationToken);
         if (existingUser != null)
         {
@@ -38,16 +37,12 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
             };
         }
 
-        // Хеширование пароля
         var passwordHash = _passwordHasher.HashPassword(request.Password);
 
-        // Создание нового пользователя
         var user = new ChatApp.Server.Domain.Entities.User(request.Username, passwordHash);
 
-        // Сохранение в репозиторий
         await _userRepository.AddAsync(user, cancellationToken);
 
-        // Генерация JWT токена
         var token = _jwtTokenGenerator.GenerateToken(user.Id, user.Username);
 
         return new RegisterResponse

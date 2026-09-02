@@ -20,7 +20,6 @@ public class SendMessageUseCaseTests
     [SetUp]
     public void Setup()
     {
-        // Arrange
         _userRepository = Substitute.For<IUserRepository>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.Users.Returns(_userRepository);
@@ -29,12 +28,11 @@ public class SendMessageUseCaseTests
     }
 
     /// <summary>
-    /// Тест: успешная отправка сообщения
+    /// Тест: проверка что сообщение добавляется к пользователю
     /// </summary>
     [Test]
     public async Task ExecuteAuthAsync_WithValidData_ShouldSendMessageSuccessfully()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var request = new SendMessageAuthRequest
         {
@@ -49,27 +47,23 @@ public class SendMessageUseCaseTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(1));
 
-        // Act
         var result = await _useCase.ExecuteAuthAsync(userId, request, CancellationToken.None);
 
-        // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.SenderName, Is.EqualTo("testuser"));
         Assert.That(result.Content, Is.EqualTo("Hello, World!"));
         Assert.That(result.Timestamp, Is.EqualTo(DateTime.UtcNow).Within(TimeSpan.FromSeconds(1)));
         
-        // Проверяем, что методы были вызваны
         await _userRepository.Received(1).GetByIdAsync(userId, Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// Тест: отправка сообщения несуществующим пользователем
+    /// Тест: проверка что сообщение добавляется к пользователю
     /// </summary>
     [Test]
     public async Task ExecuteAuthAsync_WithNonExistentUser_ShouldReturnNull()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var request = new SendMessageAuthRequest
         {
@@ -79,13 +73,10 @@ public class SendMessageUseCaseTests
         _userRepository.GetByIdAsync(userId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<User?>(null));
 
-        // Act
         var result = await _useCase.ExecuteAuthAsync(userId, request, CancellationToken.None);
 
-        // Assert
         Assert.That(result, Is.Null);
         
-        // SaveChangesAsync не должен быть вызван
         await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -97,7 +88,6 @@ public class SendMessageUseCaseTests
     [TestCase("Third message with special chars: !@#$%^&*()")]
     public async Task ExecuteAuthAsync_MultipleMessages_ShouldSendAllSuccessfully(string content)
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var request = new SendMessageAuthRequest
         {
@@ -112,21 +102,18 @@ public class SendMessageUseCaseTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(1));
 
-        // Act
         var result = await _useCase.ExecuteAuthAsync(userId, request, CancellationToken.None);
 
-        // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Content, Is.EqualTo(content));
     }
 
     /// <summary>
-    /// Тест: отправка длинного сообщения
+    /// Тест: проверка что сообщение добавляется к пользователю
     /// </summary>
     [Test]
     public async Task ExecuteAuthAsync_WithLongMessage_ShouldSendSuccessfully()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var longContent = new string('A', 5000);
         var request = new SendMessageAuthRequest
@@ -142,10 +129,8 @@ public class SendMessageUseCaseTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(1));
 
-        // Act
         var result = await _useCase.ExecuteAuthAsync(userId, request, CancellationToken.None);
 
-        // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Content, Has.Length.EqualTo(5000));
     }
@@ -156,7 +141,6 @@ public class SendMessageUseCaseTests
     [Test]
     public async Task ExecuteAuthAsync_ShouldAddMessageToUserAggregateRoot()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         var request = new SendMessageAuthRequest
         {
@@ -172,10 +156,8 @@ public class SendMessageUseCaseTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(1));
 
-        // Act
         await _useCase.ExecuteAuthAsync(userId, request, CancellationToken.None);
 
-        // Assert
         Assert.That(user.Messages.Count, Is.EqualTo(initialMessageCount + 1));
         Assert.That(user.Messages.Last().Content, Is.EqualTo("Test message"));
     }

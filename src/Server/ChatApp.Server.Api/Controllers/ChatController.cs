@@ -54,16 +54,13 @@ public class ChatController : ControllerBase
             return Unauthorized(new { error = "Не удалось определить пользователя из токена" });
         }
 
-        // Создаем команду для MediatR
         var command = new SendMessageCommand(userId, request.Content);
 
-        // Отправляем команду через MediatR (автоматически применяются Behaviors: Logging -> UnitOfWork)
         var response = await _mediator.Send(command, cancellationToken);
 
         if (!response.Success)
             return NotFound(new { error = "Пользователь не найден" });
 
-        // Формируем DTO для ответа
         var messageDto = new ChatMessageDto
         {
             Id = response.MessageId,

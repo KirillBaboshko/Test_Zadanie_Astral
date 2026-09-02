@@ -38,6 +38,5 @@ public class OutboxService : IOutboxService
         
         await _dbContext.OutboxMessages.AddAsync(outboxMessage, cancellationToken);
         
-        // SaveChanges вызывается в UseCase вместе с основными данными
     }
 }

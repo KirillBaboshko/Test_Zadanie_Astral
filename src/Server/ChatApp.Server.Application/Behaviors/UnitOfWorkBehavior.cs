@@ -22,10 +22,8 @@ public sealed class UnitOfWorkBehavior<TRequest, TResponse> : IPipelineBehavior<
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
-        // Выполняем следующий Behavior или Handler
         var response = await next();
 
-        // Сохраняем изменения в БД (Unit of Work гарантирует транзакцию)
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return response;

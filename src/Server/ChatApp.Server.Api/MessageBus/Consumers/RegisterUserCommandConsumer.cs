@@ -38,7 +38,6 @@ public class RegisterUserCommandConsumer : IConsumer<RegisterUserCommand>
 
             if (!response.Success)
             {
-                // Пользователь уже существует
                 await context.RespondAsync(new RegisterUserResponse
                 {
                     Success = false,
@@ -51,7 +50,6 @@ public class RegisterUserCommandConsumer : IConsumer<RegisterUserCommand>
                 return;
             }
 
-            // Успешная регистрация
             await context.RespondAsync(new RegisterUserResponse
             {
                 Success = true,

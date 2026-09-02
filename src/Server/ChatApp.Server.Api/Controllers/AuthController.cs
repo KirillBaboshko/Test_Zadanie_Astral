@@ -47,7 +47,6 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // Отправляем команду через MediatR
         var command = new RegisterCommand(request.Username, request.Password);
         var response = await _mediator.Send(command, cancellationToken);
 
@@ -84,7 +83,6 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // Отправляем команду через MediatR
         var command = new LoginCommand(request.Username, request.Password);
         var response = await _mediator.Send(command, cancellationToken);
 

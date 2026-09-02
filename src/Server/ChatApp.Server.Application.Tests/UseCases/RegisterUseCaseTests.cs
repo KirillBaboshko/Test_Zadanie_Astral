@@ -22,25 +22,22 @@ public class RegisterUseCaseTests
     [SetUp]
     public void Setup()
     {
-        // Arrange - создаём моки для всех зависимостей
         _userRepository = Substitute.For<IUserRepository>();
         _passwordHasher = Substitute.For<IPasswordHasher>();
         _tokenGenerator = Substitute.For<IJwtTokenGenerator>();
         _unitOfWork = Substitute.For<IUnitOfWork>();
         
-        // Настраиваем UnitOfWork для возврата мок-репозитория
         _unitOfWork.Users.Returns(_userRepository);
         
         _useCase = new RegisterUseCase(_unitOfWork, _passwordHasher, _tokenGenerator);
     }
 
     /// <summary>
-    /// Тест: успешная регистрация нового пользователя
+    /// Тест: использование CancellationToken
     /// </summary>
     [Test]
     public async Task ExecuteAsync_WithValidRequest_ShouldRegisterUserAndReturnToken()
     {
-        // Arrange
         var request = new RegisterRequest
         {
             Username = "newuser",
@@ -50,7 +47,6 @@ public class RegisterUseCaseTests
         var hashedPassword = "hashed_password_123";
         var expectedToken = "jwt_token_xyz";
         
-        // Настраиваем моки
         _userRepository.ExistsAsync(request.Username, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
         
@@ -63,13 +59,10 @@ public class RegisterUseCaseTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(1));
 
-        // Act
         var result = await _useCase.ExecuteAsync(request, CancellationToken.None);
 
-        // Assert
         Assert.That(result, Is.EqualTo(expectedToken));
         
-        // Проверяем, что методы были вызваны
         await _userRepository.Received(1).ExistsAsync(request.Username, Arg.Any<CancellationToken>());
         _passwordHasher.Received(1).HashPassword(request.Password);
         await _userRepository.Received(1).AddAsync(Arg.Is<User>(u => 
@@ -81,12 +74,11 @@ public class RegisterUseCaseTests
     }
 
     /// <summary>
-    /// Тест: регистрация с уже существующим username должна выбросить исключение
+    /// Тест: использование CancellationToken
     /// </summary>
     [Test]
     public void ExecuteAsync_WithExistingUsername_ShouldThrowInvalidOperationException()
     {
-        // Arrange
         var request = new RegisterRequest
         {
             Username = "existinguser",
@@ -96,13 +88,11 @@ public class RegisterUseCaseTests
         _userRepository.ExistsAsync(request.Username, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        // Act & Assert
         var ex = Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await _useCase.ExecuteAsync(request, CancellationToken.None));
         
         Assert.That(ex.Message, Does.Contain("Пользователь с таким именем уже существует"));
         
-        // Проверяем, что другие методы НЕ были вызваны
         _passwordHasher.DidNotReceive().HashPassword(Arg.Any<String>());
         await _userRepository.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -117,7 +107,6 @@ public class RegisterUseCaseTests
     public async Task ExecuteAsync_WithDifferentUsernames_ShouldRegisterSuccessfully(
         string username, string password)
     {
-        // Arrange
         var request = new RegisterRequest
         {
             Username = username,
@@ -136,21 +125,18 @@ public class RegisterUseCaseTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(1));
 
-        // Act
         var result = await _useCase.ExecuteAsync(request, CancellationToken.None);
 
-        // Assert
         Assert.That(result, Is.EqualTo($"token_{username}"));
         await _userRepository.Received(1).ExistsAsync(username, Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// Тест: проверка порядка вызова методов
+    /// Тест: использование CancellationToken
     /// </summary>
     [Test]
     public async Task ExecuteAsync_ShouldCallMethodsInCorrectOrder()
     {
-        // Arrange
         var request = new RegisterRequest
         {
             Username = "testuser",
@@ -194,10 +180,8 @@ public class RegisterUseCaseTests
                 return Task.FromResult(1);
             });
 
-        // Act
         await _useCase.ExecuteAsync(request, CancellationToken.None);
 
-        // Assert
         Assert.That(callOrder, Is.EqualTo(new[]
         {
             "ExistsAsync",
@@ -214,7 +198,6 @@ public class RegisterUseCaseTests
     [Test]
     public void ExecuteAsync_WithCancelledToken_ShouldThrowOperationCanceledException()
     {
-        // Arrange
         var request = new RegisterRequest
         {
             Username = "testuser",
@@ -222,7 +205,7 @@ public class RegisterUseCaseTests
         };
         
         var cts = new CancellationTokenSource();
-        cts.Cancel(); // Отменяем токен
+        cts.Cancel();
 
         _userRepository.ExistsAsync(Arg.Any<String>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
@@ -232,7 +215,6 @@ public class RegisterUseCaseTests
                 return Task.FromResult(false);
             });
 
-        // Act & Assert
         Assert.ThrowsAsync<OperationCanceledException>(async () =>
             await _useCase.ExecuteAsync(request, cts.Token));
     }

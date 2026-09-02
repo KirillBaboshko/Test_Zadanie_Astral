@@ -34,14 +34,14 @@ public class SendMessageRequest
     public string Content { get; set; } = string.Empty;
 
     [DataMember(Order = 2)]
-    public string Token { get; set; } = string.Empty; // JWT токен для аутентификации
+    public string Token { get; set; } = string.Empty;
 }
 
 [DataContract]
 public class GetMessagesRequest
 {
     [DataMember(Order = 1)]
-    public long SinceTimestamp { get; set; } // Unix timestamp в миллисекундах (optional)
+    public long SinceTimestamp { get; set; }
 
     [DataMember(Order = 2)]
     public int Limit { get; set; }
@@ -60,7 +60,6 @@ public class GetMessagesByUserRequest
 [DataContract]
 public class GetUsersRequest
 {
-    // Пустой запрос
 }
 
 [DataContract]
@@ -86,7 +85,7 @@ public class MessageResponse
     public string Content { get; set; } = string.Empty;
 
     [DataMember(Order = 4)]
-    public long Timestamp { get; set; } // Unix timestamp в миллисекундах
+    public long Timestamp { get; set; }
 }
 
 [DataContract]

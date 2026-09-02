@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using ChatApp.Client.Application.Services;
 using ChatApp.Client.Infrastructure.Grpc;
 using ChatApp.Client.Infrastructure.Http;
@@ -19,7 +19,6 @@ InputEncoding = Encoding.UTF8;
 WriteLine("=== Chat Client с JWT аутентификацией ===");
 WriteLine();
 
-// Выбор протокола
 WriteLine("Выберите протокол:");
 WriteLine("1. HTTP (REST API)");
 WriteLine("2. gRPC (Code-first)");
@@ -34,7 +33,6 @@ WriteLine();
 IChatApiClient? apiClient = null;
 IBusControl? busControl = null;
 
-// CancellationToken для контроля жизненного цикла приложения
 using var cts = new CancellationTokenSource();
 
 CancelKeyPress += (_, e) =>
@@ -45,7 +43,6 @@ CancelKeyPress += (_, e) =>
 
 if (useMessageBus)
 {
-    // Настройка Message Bus клиента
     Write("URL RabbitMQ (по умолчанию localhost): ");
     String? rabbitHost = ReadLine();
     if (String.IsNullOrWhiteSpace(rabbitHost))
@@ -62,7 +59,6 @@ if (useMessageBus)
                 h.Username("guest");
                 h.Password("guest");
                 
-                // Настройки таймаутов для быстрого подключения
                 h.RequestedConnectionTimeout(TimeSpan.FromSeconds(5));
             });
             
@@ -113,8 +109,6 @@ if (useMessageBus)
     
     WriteLine();
     
-    // Создаём Message Bus клиент с Request Client для синхронных запросов
-    // Указываем явные адреса endpoint'ов, которые созданы ConfigureEndpoints на сервере
     var timeout = RequestTimeout.After(s: 30);
     var registerClient = busControl.CreateRequestClient<RegisterUserCommand>(
         new Uri("queue:RegisterUserCommand"), 
@@ -136,7 +130,6 @@ else
     WriteLine($"Подключение к серверу {serverUrl} через {(useGrpc ? "gRPC (Code-first)" : "HTTP")}...");
     WriteLine();
 
-    // Создаём клиент в зависимости от выбранного протокола
     apiClient = useGrpc
         ? new CodeFirstGrpcChatApiClient(serverUrl)
         : new HttpChatApiClient(serverUrl);
@@ -145,7 +138,6 @@ else
 AuthResponse? authResponse = null;
 String? currentUsername = null;
 
-// Меню авторизации
 while (authResponse == null && !cts.Token.IsCancellationRequested)
 {
     WriteLine("================================");
@@ -162,7 +154,7 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
 
     switch (choice)
     {
-        case "1": // Регистрация
+        case "1":
             Write("Введите имя пользователя (3-100 символов, только буквы, цифры, _ и -): ");
             String? regUsername = ReadLine();
             
@@ -199,7 +191,7 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             WriteLine();
             break;
 
-        case "2": // Вход
+        case "2":
             Write("Введите имя пользователя: ");
             String? loginUsername = ReadLine();
             
@@ -236,7 +228,7 @@ while (authResponse == null && !cts.Token.IsCancellationRequested)
             WriteLine();
             break;
 
-        case "0": // Выход
+        case "0":
             WriteLine("Выход из приложения...");
             cts.Cancel();
             return 0;
@@ -254,7 +246,6 @@ if (authResponse == null || currentUsername == null)
     return 1;
 }
 
-// Главное меню чата
 WriteLine();
 WriteLine("================================");
 WriteLine("       ЧАТ ПРИЛОЖЕНИЕ");
@@ -344,7 +335,6 @@ try
         if (String.IsNullOrWhiteSpace(input))
             continue;
 
-        // Отправка сообщения от авторизованного пользователя
         var request = new SendMessageAuthRequest
         {
             Content = input
@@ -371,7 +361,6 @@ catch (OperationCanceledException)
 {
 }
 
-// Остановка Message Bus если использовался
 if (busControl != null)
 {
     WriteLine("Отключение от RabbitMQ...");
@@ -390,7 +379,6 @@ WriteLine("Отключено от сервера. До свидания!");
 
 return 0;
 
-// Вспомогательная функция для ввода пароля с маскировкой
 static String ReadPasswordMasked()
 {
     var password = new StringBuilder();

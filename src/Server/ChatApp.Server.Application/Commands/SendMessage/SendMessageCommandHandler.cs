@@ -24,7 +24,6 @@ public sealed class SendMessageCommandHandler : IRequestHandler<SendMessageComma
 
     public async Task<SendMessageResponse> Handle(SendMessageCommand request, CancellationToken cancellationToken)
     {
-        // Находим пользователя
         var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
 
         if (user == null)
@@ -32,11 +31,9 @@ public sealed class SendMessageCommandHandler : IRequestHandler<SendMessageComma
             return new SendMessageResponse { Success = false };
         }
 
-        // Добавляем сообщение
         user.UpdateLastSeen();
         var message = user.AddMessage(request.Content);
 
-        // Добавляем событие в Outbox (в той же транзакции)
         await _outboxService.AddEventAsync(new MessageSentEvent
         {
             MessageId = message.Id,

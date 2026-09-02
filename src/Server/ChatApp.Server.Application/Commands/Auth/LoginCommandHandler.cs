@@ -27,7 +27,6 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
 
     public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
-        // Поиск пользователя
         var user = await _userRepository.GetByUsernameAsync(request.Username, cancellationToken);
         if (user == null)
         {
@@ -38,7 +37,6 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
             };
         }
 
-        // Проверка пароля
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
         {
             return new LoginResponse
@@ -48,10 +46,8 @@ public sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginRes
             };
         }
 
-        // Обновление last_seen
         user.UpdateLastSeen();
 
-        // Генерация JWT токена
         var token = _jwtTokenGenerator.GenerateToken(user.Id, user.Username);
 
         return new LoginResponse

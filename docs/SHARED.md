@@ -60,13 +60,19 @@ public interface IAuthService
 public interface IChatService
 {
     [OperationContract]
-    Task<SendMessageResponse> SendMessage(SendMessageRequest request);
-    
+    Task<MessageResponse> SendMessage(SendMessageRequest request);
+
     [OperationContract]
-    IAsyncEnumerable<MessageResponse> StreamMessages();
-    
+    Task<MessagesListResponse> GetMessages(GetMessagesRequest request);
+
     [OperationContract]
-    Task<GetMessagesResponse> GetMessages(GetMessagesRequest request);
+    Task<MessagesListResponse> GetMessagesByUser(GetMessagesByUserRequest request);
+
+    [OperationContract]
+    Task<UsersListResponse> GetUsers(GetUsersRequest request);
+
+    [OperationContract]
+    IAsyncEnumerable<MessageResponse> StreamMessages(StreamMessagesRequest request);
 }
 ```
 

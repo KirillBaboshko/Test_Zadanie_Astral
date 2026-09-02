@@ -21,11 +21,8 @@ public abstract class DecoratedUseCase<TRequest, TResponse> : IUseCase<TRequest,
     /// </summary>
     public async Task<TResponse> ExecuteAsync(TRequest request, CancellationToken cancellationToken = default)
     {
-        // Строим цепочку декораторов
         Func<TRequest, CancellationToken, Task<TResponse>> pipeline = ExecuteCoreAsync;
 
-        // Применяем декораторы в обратном порядке
-        // Последний зарегистрированный декоратор будет выполнен первым
         foreach (var decorator in _decorators.Reverse())
         {
             var currentPipeline = pipeline;
@@ -34,7 +31,6 @@ public abstract class DecoratedUseCase<TRequest, TResponse> : IUseCase<TRequest,
             pipeline = (req, ct) => currentDecorator.ExecuteAsync(req, currentPipeline, ct);
         }
 
-        // Выполняем полную цепочку
         return await pipeline(request, cancellationToken);
     }
 

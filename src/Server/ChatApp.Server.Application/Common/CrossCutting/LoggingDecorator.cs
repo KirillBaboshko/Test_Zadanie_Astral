@@ -25,7 +25,6 @@ public class LoggingDecorator<TRequest, TResponse> : IUseCaseDecorator<TRequest,
         var useCaseName = typeof(TResponse).Name.Replace("Response", "");
         var requestType = typeof(TRequest).Name;
 
-        // Логируем начало выполнения с параметрами
         _logger.LogInformation(
             "[UseCase Start] {UseCase} with request {RequestType}",
             useCaseName,
@@ -35,12 +34,10 @@ public class LoggingDecorator<TRequest, TResponse> : IUseCaseDecorator<TRequest,
 
         try
         {
-            // Выполняем следующий декоратор или Use Case
             var result = await next(request, cancellationToken);
 
             stopwatch.Stop();
 
-            // Логируем успешное завершение
             _logger.LogInformation(
                 "[UseCase Success] {UseCase} completed in {ElapsedMs}ms",
                 useCaseName,
@@ -52,7 +49,6 @@ public class LoggingDecorator<TRequest, TResponse> : IUseCaseDecorator<TRequest,
         {
             stopwatch.Stop();
 
-            // Логируем ошибку с деталями
             _logger.LogError(ex,
                 "[UseCase Error] {UseCase} failed after {ElapsedMs}ms: {ErrorMessage}",
                 useCaseName,

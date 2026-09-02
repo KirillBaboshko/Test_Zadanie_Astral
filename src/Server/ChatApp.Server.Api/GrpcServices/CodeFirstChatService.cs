@@ -46,10 +46,8 @@ public class CodeFirstChatService : IChatService
 
             _logger.LogInformation("{ServerInfo} gRPC SendMessage request from user: {UserId}", serverInfo, userId);
 
-            // Создаем команду для MediatR
             var command = new SendMessageCommand(userId.Value, request.Content);
 
-            // Отправляем команду через MediatR (автоматически применяются Behaviors: Logging -> UnitOfWork)
             var response = await _mediator.Send(command, context.CancellationToken);
 
             if (!response.Success)
@@ -178,7 +176,6 @@ public class CodeFirstChatService : IChatService
         StreamMessagesRequest request,
         CallContext context = default)
     {
-        // Валидация токена
         var userId = ValidateTokenAndGetUserId(request.Token);
         if (userId == null)
         {
@@ -193,11 +190,9 @@ public class CodeFirstChatService : IChatService
 
         while (!context.CancellationToken.IsCancellationRequested)
         {
-            // Получаем новые сообщения
             var query = new GetMessagesQuery(lastTimestamp, 100);
             var response = await _mediator.Send(query, context.CancellationToken);
 
-            // Отправляем новые сообщения клиенту
             foreach (var msg in response.Messages)
             {
                 yield return new MessageResponse
@@ -211,7 +206,6 @@ public class CodeFirstChatService : IChatService
                 lastTimestamp = msg.Timestamp;
             }
 
-            // Ждём перед следующей проверкой
             await Task.Delay(TimeSpan.FromSeconds(2), context.CancellationToken);
         }
 

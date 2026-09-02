@@ -50,7 +50,6 @@ public sealed class RegisterUseCase : UseCaseBase
 
             await _userRepository.AddAsync(user, ct);
 
-            // Публикуем событие регистрации в RabbitMQ
             await _publishEndpoint.Publish(new UserRegisteredEvent
             {
                 UserId = user.Id,

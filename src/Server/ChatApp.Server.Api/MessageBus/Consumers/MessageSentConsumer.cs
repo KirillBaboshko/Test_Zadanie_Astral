@@ -27,11 +27,6 @@ public class MessageSentConsumer : IConsumer<MessageSentEvent>
             message.SenderId,
             message.Timestamp);
         
-        // Здесь может быть логика:
-        // - Сохранение в аналитическую БД
-        // - Отправка уведомлений другим пользователям
-        // - Модерация контента
-        // - Обновление статистики активности
         
         return Task.CompletedTask;
     }

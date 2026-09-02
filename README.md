@@ -1,500 +1,192 @@
-# 💬 ChatApp - Распределённое чат-приложение
+# ChatApp — распределённое чат-приложение
 
-Полнофункциональное чат-приложение на .NET 10 с архитектурой клиент-сервер, JWT аутентификацией и Docker развёртыванием.
+Чат-приложение на **.NET 10** с Clean Architecture: JWT-аутентификация, PostgreSQL, RabbitMQ, несколько протоколов коммуникации и Docker-развёртывание.
 
-## 📋 Описание
+## Структура solution
 
-ChatApp - это современное чат-приложение, построенное на микросервисной архитектуре с использованием Clean Architecture и Domain-Driven Design принципов. Проект демонстрирует лучшие практики разработки enterprise-приложений на .NET.
-
-## 🏗️ Архитектура проекта
-
-Проект состоит из трёх основных солюшенов:
-
-### 1. [Server](./docs/SERVER.md) - Серверное приложение
-- **ChatApp.Server.Api** - ASP.NET Core Web API
-- **ChatApp.Server.Application** - Бизнес-логика (Use Cases)
-- **ChatApp.Server.Domain** - Доменная модель
-- **ChatApp.Server.Infrastructure** - Инфраструктура (БД, безопасность)
-
-### 2. [Client](./docs/CLIENT.md) - Клиентское приложение
-- **ChatApp.Client.Console** - Консольное приложение
-- **ChatApp.Client.Application** - Логика клиента
-- **ChatApp.Client.Infrastructure** - HTTP клиент
-
-### 3. [Shared](./docs/SHARED.md) - Общие компоненты
-- **ChatApp.Contracts** - Контракты (DTO, запросы, ответы)
-
-## 🚀 Быстрый старт
-
-### Запуск через Docker (рекомендуется)
-
-```bash
-# Сборка и запуск
-docker-compose up -d
-
-# Проверка статуса
-docker-compose ps
-
-# Просмотр логов
-docker-compose logs -f server
+```
+ChatApp.slnx
+├── src/Server/
+│   ├── ChatApp.Server.Api              # REST + gRPC + Message Bus consumers
+│   ├── ChatApp.Server.Application      # MediatR, Use Cases, Behaviors
+│   ├── ChatApp.Server.Domain           # Доменная модель
+│   ├── ChatApp.Server.Infrastructure   # EF Core, JWT, репозитории
+│   ├── ChatApp.Server.*.Tests          # Unit-тесты (NUnit)
+├── src/Client/
+│   ├── ChatApp.Client.Blazor           # Web UI (Blazor WebAssembly)
+│   ├── ChatApp.Client.Console          # Консольный клиент
+│   ├── ChatApp.Client.Application      # Интерфейсы клиента
+│   └── ChatApp.Client.Infrastructure   # HTTP / gRPC / RabbitMQ клиенты
+└── src/Shared/
+    ├── ChatApp.Contracts               # REST DTO
+    ├── ChatApp.Shared.Protos           # gRPC code-first контракты
+    └── ChatApp.Shared.Messages         # RabbitMQ Commands + Events
 ```
 
-Сервисы:
-- **API**: http://localhost:5096
-- **RabbitMQ Management UI**: http://localhost:15672 (guest/guest)
+## Быстрый старт
 
-Подробнее: [DOCKER.md](./DOCKER.md)
+### Вариант 1: Docker (бэкенд) + Blazor (локально) — рекомендуется
 
-### Локальный запуск
-
-**Требования:**
-- .NET 10 SDK
-- PostgreSQL 16
-- RabbitMQ (опционально, для message bus)
-
-**Запуск RabbitMQ (через Docker):**
 ```bash
-.\start-rabbitmq.ps1
+# Терминал 1: инфраструктура и API
+docker compose up -d
+
+# Терминал 2: веб-клиент
+cd src/Client/ChatApp.Client.Blazor
+dotnet run --launch-profile http
 ```
 
-**Запуск сервера:**
+| Сервис | URL |
+|--------|-----|
+| Blazor UI | http://localhost:5073 |
+| REST API | http://localhost:5096 |
+| gRPC | localhost:5097 |
+| RabbitMQ UI | http://localhost:15672 (guest/guest) |
+
+### Вариант 2: Полностью локально
+
+**Требования:** .NET 10 SDK, PostgreSQL 16, RabbitMQ
+
 ```bash
+# Сервер
 cd src/Server/ChatApp.Server.Api
 dotnet run
-```
 
-**Запуск клиента:**
-```bash
+# Консольный клиент
 cd src/Client/ChatApp.Client.Console
 dotnet run
+
+# Blazor
+cd src/Client/ChatApp.Client.Blazor
+dotnet run --launch-profile http
 ```
 
-## 🎯 Основные возможности
+## Docker
 
-### Функциональность
-- ✅ Регистрация и аутентификация пользователей
-- ✅ JWT токены для безопасности (RSA SHA-256)
-- ✅ Отправка и получение сообщений в реальном времени
-- ✅ Просмотр истории сообщений
-- ✅ Фильтрация сообщений по пользователю
-- ✅ Автоматическая очистка старых сообщений (MessageCleanupService)
-- ✅ Множественные протоколы коммуникации:
-  - **HTTP REST API** - Традиционный RESTful подход
-  - **gRPC Code-first** - RPC с protobuf-net.Grpc
-- ✅ Асинхронная шина сообщений (MassTransit + RabbitMQ):
-  - Публикация событий (регистрация, вход, отправка сообщений)
-  - Асинхронная обработка через consumers
-  - Готовность к Outbox паттерну
+Проект использует Docker Compose для инфраструктуры и сервера. **Blazor запускается локально** (вне Docker).
 
-### Технологии
-- **.NET 10** - Последняя версия .NET
-- **ASP.NET Core** - Web API фреймворк
-- **Entity Framework Core** - ORM для работы с БД
-- **PostgreSQL 16** - Реляционная база данных
-- **FluentValidation** - Валидация запросов
-- **JWT Bearer** - Аутентификация
-- **gRPC** - Code-first подход для RPC коммуникации
-- **MassTransit + RabbitMQ** - Асинхронная шина сообщений
-- **Docker** - Контейнеризация
+| Сервис | Контейнер | Порт на хосте |
+|--------|-----------|---------------|
+| `postgres` | chatapp-postgres | 5432 |
+| `rabbitmq` | chatapp-rabbitmq | 5672, 15672 |
+| `server` | chatapp-server | 5096 (HTTP), 5097 (gRPC) |
+| `client` | chatapp-client | профиль `client` |
 
-### Архитектурные паттерны
-- ✅ **Clean Architecture** - Слоистая архитектура
-- ✅ **Domain-Driven Design** - Aggregate Root, Value Objects
-- ✅ **CQRS** - Разделение команд и запросов (Use Cases)
-- ✅ **Repository Pattern** - Абстракция доступа к данным
-- ✅ **Unit of Work** - Управление транзакциями
-- ✅ **Dependency Injection** - Инверсия зависимостей
-
-## 📊 Структура базы данных
-
-```sql
-users
-├── id (uuid, PK)
-├── username (varchar, unique)
-├── password_hash (varchar)
-├── created_at (timestamp)
-└── last_login (timestamp)
-
-messages
-├── id (uuid, PK)
-├── user_id (uuid, FK -> users)
-├── content (text)
-└── timestamp (timestamp)
+```bash
+docker compose up -d
+docker compose down
+docker compose logs -f server
+docker compose up -d --build server
 ```
 
-## 🔐 Безопасность
+**Маппинг портов сервера:** хост `5096 → 8080` (REST), `5097 → 8081` (gRPC). В контейнере заданы `HTTP_PORT=8080`, `GRPC_PORT=8081`. Kestrel слушает `ListenAnyIP` — иначе API недоступен с хоста.
+
+**Blazor + Docker backend:** `docker compose up -d`, затем `dotnet run --launch-profile http` в `ChatApp.Client.Blazor`. API: `http://localhost:5096` из `wwwroot/appsettings.json`. Используйте http-профиль, не https (mixed content).
+
+**Консольный клиент в Docker:** `docker compose --profile client run --rm client`
+
+Swagger в Docker недоступен (`Production`) — для Swagger запускайте сервер локально через `dotnet run`.
+
+Подробнее о сервере и Docker: [SERVER.md](./docs/SERVER.md)
+
+## Клиенты
+
+| Клиент | Протокол | Запуск |
+|--------|----------|--------|
+| **Blazor** | HTTP REST | `dotnet run` (локально, порт 5073) |
+| **Console** | HTTP / gRPC / RabbitMQ | выбор при старте |
+| **Console (Docker)** | HTTP | `docker compose --profile client run --rm client` |
+
+Blazor настраивается через `src/Client/ChatApp.Client.Blazor/wwwroot/appsettings.json`:
+
+```json
+{ "ApiBaseUrl": "http://localhost:5096" }
+```
+
+## Протоколы коммуникации
+
+Все три протокола ведут к **одной бизнес-логике** (MediatR → Application):
+
+```
+Blazor / Console (HTTP) ──► REST Controllers ──┐
+Console (gRPC)          ──► CodeFirst Services ├──► MediatR ──► Domain ──► PostgreSQL
+Console (RabbitMQ)      ──► Command Consumers ┘
+```
+
+| Протокол | Порт | Назначение |
+|----------|------|------------|
+| HTTP REST | 5096 | Blazor, Swagger, универсальный API |
+| gRPC (code-first) | 5097 | Альтернатива REST для консоли, server streaming |
+| RabbitMQ | 5672 | Real-time события, async команды |
+
+## API (HTTP REST)
 
 ### Аутентификация
-- JWT токены с RSA SHA-256 подписью (2048 бит)
-- Время жизни токена: 7 дней
-- При перезапуске сервера старые токены становятся невалидными
-
-### Хеширование паролей
-- PBKDF2 алгоритм
-- 100,000 итераций
-- SHA-256 хеш-функция
-- Уникальная соль для каждого пользователя
-
-## 📡 API Endpoints
-
-### HTTP REST API
-
-#### Аутентификация
 ```
-POST /api/auth/register - Регистрация нового пользователя
-POST /api/auth/login    - Вход в систему
+POST /api/auth/register
+POST /api/auth/login
 ```
 
-#### Сообщения
+### Сообщения
 ```
-POST /api/chat/messages              - Отправка сообщения (требует JWT)
-GET  /api/chat/messages              - Получение всех сообщений
-GET  /api/chat/messages/user/{id}    - Сообщения конкретного пользователя
-GET  /api/chat/messages-for-name     - Сообщения по имени пользователя
-```
-
-#### Пользователи
-```
-GET /api/chat/users           - Список всех пользователей
-GET /api/chat/about-user/{id} - Информация о пользователе
+POST /api/chat/messages              # JWT required
+GET  /api/chat/messages
+GET  /api/chat/messages/user/{id}
+GET  /api/chat/messages-for-name
 ```
 
-### gRPC API (Code-first)
-
-**Порт:** 5097
-
-**Сервисы:**
-- `IAuthService` - Регистрация и аутентификация
-- `IChatService` - Отправка/получение сообщений, streaming
-
-**DNS Round-Robin:** Настроен пулинг HTTP/2 соединений для балансировки нагрузки
-
-### Message Bus Commands (RabbitMQ)
-
-**Команды от клиента → серверу:**
-- `RegisterUserCommand` → регистрация (Request-Response)
-- `LoginUserCommand` → вход (Request-Response)
-- `SendMessageCommand` → отправка сообщения (fire-and-forget)
-
-**Ответы сервера → клиенту:**
-- `RegisterUserResponse` - токен и данные пользователя
-- `LoginUserResponse` - токен и данные пользователя
-
-**Request-Response паттерн:** Клиент отправляет команду и ждёт ответ (для Auth)  
-**Fire-and-forget паттерн:** Клиент отправляет команду без ожидания (для SendMessage)
-
-### Message Bus Events (RabbitMQ)
-
-**Публикуемые события:**
-- `UserRegisteredEvent` - Пользователь зарегистрирован
-- `UserLoggedInEvent` - Пользователь вошёл в систему
-- `MessageSentEvent` - Сообщение отправлено
-
-**Server Consumers (обработка событий):**
-- `UserRegisteredConsumer` - Обработка регистрации (welcome действия)
-- `UserLoggedInConsumer` - Логирование входов
-- `MessageSentConsumer` - Аналитика сообщений
-
-**Client Consumers (получение событий в реальном времени):**
-- `MessageSentEventConsumer` - Отображение новых сообщений
-- `UserRegisteredEventConsumer` - Уведомления о новых пользователях
-
-**Архитектура Message Bus:**
+### Пользователи
 ```
-Клиент A отправляет:
-  SendMessageCommand → RabbitMQ → Server Consumer → БД → MessageSentEvent
-
-Клиент B получает:
-  MessageSentEvent → RabbitMQ → Client Consumer → отображение в консоли
-
-Результат: Реальное время как в Telegram/Slack!
+GET /api/chat/users
+GET /api/chat/about-user/{id}
 ```
 
-Подробная документация API: [Swagger UI](http://localhost:5096) (после запуска)
+Swagger (только Development): http://localhost:5096
 
-## 🧪 Тестирование
+## Технологии
 
-### Тест API через PowerShell
+- ASP.NET Core Web API, Blazor WebAssembly
+- Entity Framework Core + PostgreSQL 16
+- JWT (RSA SHA-256), PBKDF2 для паролей
+- MediatR, FluentValidation, CQRS
+- gRPC code-first (protobuf-net.Grpc)
+- MassTransit + RabbitMQ
+- Docker Compose
+- NUnit, NSubstitute, coverlet
+
+## Тестирование
+
+Unit-тесты: **NUnit**, моки **NSubstitute**, покрытие **coverlet**.
+
+```
+src/Server/
+├── ChatApp.Server.Domain.Tests/
+├── ChatApp.Server.Application.Tests/
+└── ChatApp.Server.Infrastructure.Tests/
+```
+
 ```bash
-.\test-api.ps1
+dotnet test ChatApp.slnx
+dotnet test ChatApp.slnx --collect:"XPlat Code Coverage"
 ```
 
-### Ручное тестирование
+Тесты следуют паттерну **AAA** (Arrange, Act, Assert), для параметризации — `[TestCase]`. Подробнее: [SERVER.md](./docs/SERVER.md)
 
-**Регистрация:**
-```bash
-curl -X POST http://localhost:5096/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"test123"}'
-```
+## Документация
 
-**Отправка сообщения:**
-```bash
-curl -X POST http://localhost:5096/api/chat/messages \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"content":"Hello World!"}'
-```
+- [Сервер](./docs/SERVER.md)
+- [Клиент](./docs/CLIENT.md)
+- [Shared](./docs/SHARED.md)
+- [Декораторы](./docs/DECORATORS.md)
 
-## 🛠️ Разработка
+## Миграции БД
 
-### Структура проекта
-```
-Test_Zadanie_Astral/
-├── src/
-│   ├── Server/           # Серверная часть
-│   ├── Client/           # Клиентская часть
-│   └── Shared/           # Общие компоненты
-├── docs/                 # Документация
-├── docker-compose.yml    # Docker конфигурация
-├── database-setup.sql    # Инициализация БД
-├── clear-data.sql        # Очистка данных
-└── test-api.ps1         # Тестовый скрипт
-
-```
-
-### Миграции базы данных
-
-**Создание миграции:**
 ```bash
 cd src/Server/ChatApp.Server.Infrastructure
 dotnet ef migrations add MigrationName --startup-project ../ChatApp.Server.Api
-```
-
-**Применение миграций:**
-```bash
 dotnet ef database update --startup-project ../ChatApp.Server.Api
 ```
 
-### Фоновые сервисы
-
-**MessageCleanupService** - Автоматическая очистка сообщений:
-- Интервал проверки: каждую минуту
-- Срок хранения: 1 день
-- Лимит сообщений: 10,000
-
-## 📚 Документация
-
-- [Серверное приложение](./docs/SERVER.md)
-- [Клиентское приложение](./docs/CLIENT.md)
-- [Общие компоненты](./docs/SHARED.md)
-- [Docker развёртывание](./DOCKER.md)
-
-## 🐳 Docker
-
-Проект полностью контейнеризован и готов к развёртыванию:
-
-```bash
-# Запуск всех сервисов
-docker-compose up -d
-
-# Остановка
-docker-compose down
-
-# Просмотр логов
-docker-compose logs -f
-
-# Подключение к БД
-docker exec -it chatapp-postgres psql -U postgres -d chatapp
-```
-
-Подробнее: [DOCKER.md](./DOCKER.md)
-
-## 📝 Конфигурация
-
-### appsettings.json (Server)
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=chatapp;Username=postgres;Password=postgres"
-  },
-  "Jwt": {
-    "Issuer": "ChatApp",
-    "Audience": "ChatApp.Client"
-  }
-}
-```
-
-### Переменные окружения (Docker)
-```env
-ASPNETCORE_ENVIRONMENT=Production
-ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=chatapp;...
-Jwt__Issuer=ChatApp
-Jwt__Audience=ChatApp.Client
-```
-
-## 🎓 Изученные концепции
-
-Этот проект демонстрирует:
-- Clean Architecture и разделение ответственности
-- Domain-Driven Design с Aggregate Root
-- CQRS паттерн через Use Cases
-- Repository и Unit of Work паттерны
-- JWT аутентификацию с RSA подписью
-- PBKDF2 хеширование паролей
-- Entity Framework Core с миграциями
-- FluentValidation для валидации
-- Background Services в ASP.NET Core
-- gRPC Code-first с protobuf-net.Grpc
-- DNS Round-Robin балансировка для gRPC
-- MassTransit + RabbitMQ для асинхронной коммуникации
-- Event-Driven Architecture с message bus
-- Готовность к Transactional Outbox паттерну
-- Docker контейнеризацию multi-stage builds
-- Docker Compose оркестрацию
-
-## 🔧 Требования
-
-### Для разработки:
-- .NET 10 SDK
-- PostgreSQL 16
-- RabbitMQ (опционально, для message bus)
-- Visual Studio 2022 / Rider / VS Code
-- Docker Desktop (опционально)
-
-### Для запуска через Docker:
-- Docker Desktop
-- Docker Compose
-
-## 📄 Лицензия
-
-Этот проект создан в учебных целях.
-
-## 👤 Автор
-
-Тестовое задание для Astral
-
 ---
 
-**Готово к использованию!** 🚀
-
-Для быстрого старта: `docker-compose up -d && .\test-api.ps1`
-
-## 📐 Архитектурная диаграмма
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                               CLIENT                                         │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  ChatApp.Client.Console                                              │   │
-│  │  - Выбор протокола:                                                  │   │
-│  │    1. HTTP REST                                                      │   │
-│  │    2. gRPC Code-first                                                │   │
-│  │    3. Message Bus (Async RabbitMQ) ← НОВОЕ!                         │   │
-│  └───────────────────┬──────────────────────────────────────────────────┘   │
-│                      │                                                       │
-│  ┌───────────────────▼──────────────────────────────────────────────────┐   │
-│  │  ChatApp.Client.Infrastructure                                       │   │
-│  │  ┌──────────────┐  ┌─────────────────┐  ┌─────────────────────────┐ │   │
-│  │  │ HttpClient   │  │ CodeFirstGrpc   │  │ MessageBusApiClient     │ │   │
-│  │  │ REST API     │  │ DNS Round-Robin │  │ Commands + Events       │ │   │
-│  │  └──────────────┘  └─────────────────┘  └─────────────────────────┘ │   │
-│  │                                          │ Client Consumers:        │ │   │
-│  │                                          │ - MessageSentEvent       │ │   │
-│  │                                          │ - UserRegisteredEvent    │ │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-└──────────────┬──────────────┬───────────────────┬────────────────────────────┘
-               │ HTTP :5096   │ gRPC :5097        │ RabbitMQ :5672
-               │              │                   │ (Commands + Events)
-┌──────────────▼──────────────▼───────────────────▼────────────────────────────┐
-│                               SERVER                                          │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  ChatApp.Server.Api (ASP.NET Core)                                     │  │
-│  │  ┌────────────┐  ┌──────────────┐  ┌───────────────────────────────┐  │  │
-│  │  │ REST       │  │ gRPC Code-   │  │ Message Bus Consumers         │  │  │
-│  │  │ Controllers│  │ first        │  │ КОМАНДЫ:                      │  │  │
-│  │  └────────────┘  └──────────────┘  │ - RegisterUserCommand         │  │  │
-│  │                                     │ - LoginUserCommand            │  │  │
-│  │                                     │ - SendMessageCommand          │  │  │
-│  │                                     │ СОБЫТИЯ (для аналитики):      │  │  │
-│  │                                     │ - MessageSent                 │  │  │
-│  │                                     │ - UserRegistered              │  │  │
-│  │                                     │ - UserLoggedIn                │  │  │
-│  │                                     └───────────────────────────────┘  │  │
-│  └────────┬───────────────────────────────────────────────────────────────┘  │
-│           │                                                                   │
-│  ┌────────▼───────────────────────────────────────────────────────────────┐  │
-│  │  ChatApp.Server.Application (Use Cases)                               │  │
-│  │  - RegisterUseCase    ──┐                                             │  │
-│  │  - LoginUseCase       ──┼── Публикуют события                        │  │
-│  │  - SendMessageUseCase ──┘   в RabbitMQ через                         │  │
-│  │                             IPublishEndpoint                           │  │
-│  └────────┬───────────────────────────────────────────────────────────────┘  │
-│           │                                                                   │
-│  ┌────────▼───────────────────────────────────────────────────────────────┐  │
-│  │  ChatApp.Server.Domain                                                 │  │
-│  │  - User (Aggregate Root)                                               │  │
-│  │  - ChatMessage (Entity)                                                │  │
-│  └────────┬───────────────────────────────────────────────────────────────┘  │
-│           │                                                                   │
-│  ┌────────▼───────────────────────────────────────────────────────────────┐  │
-│  │  ChatApp.Server.Infrastructure                                         │  │
-│  │  - Repository (EF Core)                                                │  │
-│  │  - Unit of Work                                                        │  │
-│  │  - JWT Token Generator (RSA SHA-256)                                   │  │
-│  │  - Password Hasher (PBKDF2)                                            │  │
-│  └────────┬───────────────────────────────────────────────────────────────┘  │
-│           │                                                                   │
-└───────────┼───────────────────────────────────────────────────────────────────┘
-            │
-   ┌────────┴─────────┬─────────────────────┐
-   │                  │                     │
-   ▼                  ▼                     ▼
-┌──────────┐   ┌─────────────┐   ┌─────────────────────────┐
-│PostgreSQL│   │  RabbitMQ   │   │  MassTransit            │
-│  :5432   │   │   :5672     │   │                         │
-│          │   │  Management │   │  SERVER Consumers:      │
-│ users    │   │   UI :15672 │   │  ┌───────────────────┐  │
-│ messages │   │             │   │  │ Command Handlers: │  │
-│          │   │  Exchanges: │   │  │ - RegisterUser    │  │
-└──────────┘   │  - Commands │   │  │ - LoginUser       │  │
-               │  - Events   │   │  │ - SendMessage     │  │
-               │             │   │  └───────────────────┘  │
-               │  Queues:    │   │  ┌───────────────────┐  │
-               │  - RegisterU│   │  │ Event Handlers:   │  │
-               │  - LoginUser│   │  │ - MessageSent     │  │
-               │  - SendMessa│   │  │ - UserRegistered  │  │
-               │  - UserRegis│   │  │ - UserLoggedIn    │  │
-               │  - MessageSe│   │  └───────────────────┘  │
-               └─────────────┘   │                         │
-                                 │  CLIENT Consumers:      │
-                                 │  ┌───────────────────┐  │
-                                 │  │ - MessageSent     │  │
-                                 │  │ - UserRegistered  │  │
-                                 │  └───────────────────┘  │
-                                 └─────────────────────────┘
-
-SHARED COMPONENTS:
-├── ChatApp.Contracts (HTTP REST DTO)
-├── ChatApp.Shared.Protos (gRPC Code-first контракты)
-└── ChatApp.Shared.Messages (RabbitMQ Commands + Events) ← НОВОЕ!
-    ├── Commands/ (клиент → сервер)
-    │   ├── RegisterUserCommand
-    │   ├── LoginUserCommand
-    │   └── SendMessageCommand
-    ├── Responses/ (сервер → клиент)
-    │   ├── RegisterUserResponse
-    │   └── LoginUserResponse
-    └── Events/ (broadcast всем)
-        ├── UserRegisteredEvent
-        ├── UserLoggedInEvent
-        └── MessageSentEvent
-
-ПРОТОКОЛЫ КОММУНИКАЦИИ:
-1. HTTP REST API (порт 5096) - Традиционный подход
-2. gRPC Code-first (порт 5097) - RPC с DNS Round-Robin
-3. RabbitMQ Message Bus (порт 5672) - Асинхронные команды и события
-   - Commands (Request-Response): RegisterUser, LoginUser
-   - Commands (Fire-and-Forget): SendMessage
-   - Events (Broadcast): MessageSent, UserRegistered, UserLoggedIn
-
-FLOW MESSAGE BUS:
-Клиент A → SendMessageCommand → RabbitMQ → Server Consumer → БД
-                                                ↓
-                                         MessageSentEvent
-                                                ↓
-                      Клиенты B,C,D... ← RabbitMQ ← Publish
-
-Результат: Все клиенты видят сообщения в реальном времени!
-```
-
+Тестовое задание для Astral

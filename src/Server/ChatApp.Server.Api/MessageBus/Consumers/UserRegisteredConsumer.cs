@@ -26,11 +26,6 @@ public class UserRegisteredConsumer : IConsumer<UserRegisteredEvent>
             message.UserId,
             message.RegisteredAt);
         
-        // Здесь может быть логика:
-        // - Отправка приветственного email
-        // - Создание дефолтных настроек пользователя
-        // - Добавление в систему рекомендаций
-        // - Отправка статистики в аналитику
         
         return Task.CompletedTask;
     }

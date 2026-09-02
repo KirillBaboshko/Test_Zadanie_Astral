@@ -30,12 +30,10 @@ public class SendMessageCommandConsumer : IConsumer<ChatApp.Shared.Messages.Comm
 
         try
         {
-            // Создаем MediatR команду (используем полное имя для избежания конфликта)
             var command = new ChatApp.Server.Application.Commands.SendMessage.SendMessageCommand(
                 rabbitCommand.UserId,
                 rabbitCommand.Content);
 
-            // Отправляем команду через MediatR (автоматически применяются Behaviors: Logging -> UnitOfWork)
             var response = await _mediator.Send(command, context.CancellationToken);
 
             if (!response.Success)

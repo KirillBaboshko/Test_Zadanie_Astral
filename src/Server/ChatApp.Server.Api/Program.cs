@@ -24,23 +24,33 @@ var rsaKey = new RsaSecurityKey(rsa);
 var builder = WebApplication.CreateBuilder(args);
 
 
-var httpPort = int.TryParse(Environment.GetEnvironmentVariable("HTTP_PORT"), out var hPort) ? hPort : 5096;
-var grpcPort = int.TryParse(Environment.GetEnvironmentVariable("GRPC_PORT"), out var gPort) ? gPort : 5097;
+var httpPort = ResolvePort("HTTP_PORT", "ASPNETCORE_HTTP_PORTS", 5096);
+var grpcPort = ResolvePort("GRPC_PORT", "ASPNETCORE_GRPC_PORTS", 5097);
 
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // HTTP/1.1 для REST API
-    options.ListenLocalhost(httpPort, listenOptions =>
+    // ListenAnyIP нужен для Docker: порт-маппинг приходит не на 127.0.0.1
+    options.ListenAnyIP(httpPort, listenOptions =>
     {
         listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1;
     });
-    
-    // HTTP/2 для gRPC без TLS
-    options.ListenLocalhost(grpcPort, listenOptions =>
+
+    options.ListenAnyIP(grpcPort, listenOptions =>
     {
         listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
     });
 });
+
+static int ResolvePort(string primaryEnvVar, string fallbackEnvVar, int defaultPort)
+{
+    if (int.TryParse(Environment.GetEnvironmentVariable(primaryEnvVar), out var primaryPort))
+        return primaryPort;
+
+    if (int.TryParse(Environment.GetEnvironmentVariable(fallbackEnvVar), out var fallbackPort))
+        return fallbackPort;
+
+    return defaultPort;
+}
 
 Console.WriteLine($"Server configured: HTTP port {httpPort}, gRPC port {grpcPort}");
 
@@ -75,12 +85,10 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddValidatorsFromAssemblyContaining<SendMessageUseCase>();
 
-// Регистрация MediatR с Handlers и Behaviors из Application сборки
 builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssemblyContaining<ChatApp.Server.Application.Commands.SendMessage.SendMessageCommand>();
     
-    // Регистрация Behaviors (порядок важен: Logging -> UnitOfWork -> Handler)
     cfg.AddOpenBehavior(typeof(ChatApp.Server.Application.Behaviors.LoggingBehavior<,>));
     cfg.AddOpenBehavior(typeof(ChatApp.Server.Application.Behaviors.UnitOfWorkBehavior<,>));
 });
@@ -110,7 +118,6 @@ builder.Services.AddMassTransit(x =>
             h.Password(rabbitPass);
         });
 
-        // Автоматическая настройка endpoints для consumers
         cfg.ConfigureEndpoints(context);
     });
 });
@@ -180,7 +187,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Code-first gRPC сервисы (новый подход)
 app.MapGrpcService<CodeFirstAuthService>();
 app.MapGrpcService<CodeFirstChatService>();
 

@@ -44,7 +44,6 @@ public class CodeFirstAuthService : IAuthService
 
             _logger.LogInformation("{ServerInfo} Registration successful for: {Username}", serverInfo, request.Username);
 
-            // Вычисляем ExpiresAt (токен действителен 7 дней)
             var expiresAt = DateTime.UtcNow.AddDays(7);
 
             return new AuthResponse
@@ -97,7 +96,6 @@ public class CodeFirstAuthService : IAuthService
 
             _logger.LogInformation("{ServerInfo} Login successful for: {Username}", serverInfo, request.Username);
 
-            // Вычисляем ExpiresAt (токен действителен 7 дней)
             var expiresAt = DateTime.UtcNow.AddDays(7);
 
             return new AuthResponse

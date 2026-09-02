@@ -30,7 +30,6 @@ public sealed class MessageCleanupService : BackgroundService
             "MessageCleanupService запущен. Интервал проверки: {Interval} мин, Срок хранения: {Retention} дн, Лимит: {Limit} сообщений",
             CheckIntervalMinutes, RetentionDays, MaxTotalMessages);
 
-        // Даём время на запуск приложения
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -63,7 +62,6 @@ public sealed class MessageCleanupService : BackgroundService
         var cutoffDate = DateTime.UtcNow.AddDays(-RetentionDays);
         var totalDeleted = 0;
 
-        // 1. Удаляем сообщения старше 1 дня
         var deletedByTime = await context.Users
             .SelectMany(u => u.Messages)
             .Where(m => m.Timestamp < cutoffDate)
@@ -76,7 +74,6 @@ public sealed class MessageCleanupService : BackgroundService
             _logger.LogInformation("Удалено {Count} сообщений старше {Days} дня", deletedByTime, RetentionDays);
         }
 
-        // 2. Проверяем общее количество сообщений
         var currentTotalCount = await context.Users
             .SelectMany(u => u.Messages)
             .CountAsync(cancellationToken);
@@ -89,7 +86,6 @@ public sealed class MessageCleanupService : BackgroundService
                 "Текущее количество сообщений ({Current}) превышает лимит ({Limit}). Удаляем {ToDelete} самых старых",
                 currentTotalCount, MaxTotalMessages, toDeleteCount);
 
-            // Удаляем самые старые сообщения
             var oldestMessageIds = await context.Users
                 .SelectMany(u => u.Messages)
                 .OrderBy(m => m.Timestamp)

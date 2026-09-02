@@ -26,11 +26,6 @@ public class UserLoggedInConsumer : IConsumer<UserLoggedInEvent>
             message.UserId,
             message.LoggedInAt);
         
-        // Здесь может быть логика:
-        // - Сохранение истории входов для безопасности
-        // - Обнаружение подозрительной активности
-        // - Обновление статистики активных пользователей
-        // - Отправка уведомлений о входе с нового устройства
         
         return Task.CompletedTask;
     }

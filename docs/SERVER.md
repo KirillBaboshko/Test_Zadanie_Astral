@@ -33,6 +33,40 @@ Server/
   - `GET /api/chat/users` - Список пользователей
   - `GET /api/chat/about-user/{username}` - Информация о пользователе
 
+#### Program.cs
+Конфигурация приложения:
+- **Kestrel** — два порта: HTTP/1.1 (REST) и HTTP/2 (gRPC)
+- Регистрация сервисов (DI), JWT, Swagger, CORS
+- MediatR + MassTransit (RabbitMQ)
+- Миграции БД при старте
+- Background services (`MessageCleanupService`, `OutboxPublisherService`)
+
+**Порты (локально):**
+
+| Переменная | По умолчанию | Протокол |
+|------------|--------------|----------|
+| `HTTP_PORT` | 5096 | HTTP/1.1 — REST API |
+| `GRPC_PORT` | 5097 | HTTP/2 — gRPC |
+
+**Порты (Docker):**
+
+| Хост | Контейнер | Переменная |
+|------|-----------|------------|
+| 5096 | 8080 | `HTTP_PORT=8080` |
+| 5097 | 8081 | `GRPC_PORT=8081` |
+
+Kestrel использует `ListenAnyIP` (не `ListenLocalhost`) — обязательно для работы Docker port mapping.
+
+#### gRPC Services (Code-first)
+- **CodeFirstAuthService** — `IAuthService` (Register, Login)
+- **CodeFirstChatService** — `IChatService` (SendMessage, GetMessages, StreamMessages, …)
+
+gRPC-сервисы вызывают те же MediatR-команды, что и REST-контроллеры.
+
+#### Message Bus Consumers
+- **RegisterUserCommandConsumer**, **LoginUserCommandConsumer**, **SendMessageCommandConsumer**
+- **UserRegisteredConsumer**, **UserLoggedInConsumer**, **MessageSentConsumer**
+
 #### Background Services
 - **MessageCleanupService** - Фоновая очистка сообщений
   - Интервал проверки: каждую минуту
@@ -40,19 +74,13 @@ Server/
   - Ограничение: максимум 10,000 сообщений
   - Использует `ExecuteDeleteAsync` для эффективности
 
-#### Program.cs
-Конфигурация приложения:
-- Регистрация сервисов (DI)
-- Настройка JWT аутентификации
-- Подключение Swagger
-- CORS политики
-- Миграции базы данных при запуске
-- Background services
-
 ### Зависимости:
 ```xml
 <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
 <PackageReference Include="Swashbuckle.AspNetCore" />
+<PackageReference Include="Grpc.AspNetCore" />
+<PackageReference Include="protobuf-net.Grpc.AspNetCore" />
+<PackageReference Include="MassTransit.RabbitMQ" />
 <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
 ```
 
@@ -487,7 +515,21 @@ API будет доступен на: http://localhost:5096
 ### Через Docker:
 
 ```bash
-docker-compose up -d
+docker compose up -d
+```
+
+API: http://localhost:5096 (REST), localhost:5097 (gRPC)
+
+**Сервисы:** `postgres`, `rabbitmq`, `server`. Blazor (`blazor-client`) в compose закомментирован.
+
+**Порты:** хост `5096 → 8080` (REST), `5097 → 8081` (gRPC). Переменные `HTTP_PORT=8080`, `GRPC_PORT=8081`.
+
+**Полезные команды:**
+```bash
+docker compose down
+docker compose logs -f server
+docker compose up -d --build server
+docker exec -it chatapp-postgres psql -U postgres -d chatapp
 ```
 
 ---
@@ -524,7 +566,21 @@ docker-compose up -d
 
 ## 🧪 Тестирование
 
-### API тесты:
+### Unit-тесты
+
+Проекты: `ChatApp.Server.Domain.Tests`, `ChatApp.Server.Application.Tests`, `ChatApp.Server.Infrastructure.Tests`.
+
+**Стек:** NUnit, NUnit3TestAdapter, NSubstitute, coverlet.collector, Microsoft.NET.Test.Sdk.
+
+```bash
+dotnet test ChatApp.slnx
+dotnet test src/Server/ChatApp.Server.Application.Tests
+dotnet test ChatApp.slnx --collect:"XPlat Code Coverage" --results-directory ./TestResults
+```
+
+Тесты используют паттерн **AAA** (Arrange, Act, Assert) и `[TestCase]` для параметризации.
+
+### API тесты (ручные):
 
 ```bash
 # Регистрация
