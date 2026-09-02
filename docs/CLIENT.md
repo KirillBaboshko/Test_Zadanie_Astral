@@ -1,15 +1,73 @@
-# 💻 Client - Клиентское приложение
+# 💻 Client - Клиентские приложения
 
-Клиентская часть ChatApp - консольное приложение с поддержкой JWT аутентификации и real-time опроса сообщений.
+Клиентская часть ChatApp включает **Blazor WebAssembly** (веб-UI) и **консольное приложение** с выбором протокола (HTTP / gRPC / RabbitMQ).
 
 ## 📦 Структура
 
 ```
 Client/
-├── ChatApp.Client.Console/         # Консольное приложение (UI)
-├── ChatApp.Client.Application/     # Логика клиента, сервисы
-└── ChatApp.Client.Infrastructure/  # HTTP клиент, внешние зависимости
+├── ChatApp.Client.Blazor/          # Blazor WebAssembly (веб-клиент)
+├── ChatApp.Client.Console/         # Консольное приложение
+├── ChatApp.Client.Application/     # Интерфейсы и абстракции
+└── ChatApp.Client.Infrastructure/  # HTTP, gRPC, Message Bus реализации
 ```
+
+---
+
+## 🌐 ChatApp.Client.Blazor
+
+**Назначение:** веб-интерфейс чата (Blazor WebAssembly). Запускается **локально**, бэкенд — в Docker или локально.
+
+### Запуск
+
+```bash
+cd src/Client/ChatApp.Client.Blazor
+dotnet run --launch-profile http
+```
+
+- UI: http://localhost:5073
+- API: настраивается в `wwwroot/appsettings.json`
+
+```json
+{
+  "ApiBaseUrl": "http://localhost:5096"
+}
+```
+
+### Типичный сценарий (Docker backend + Blazor local)
+
+```bash
+# Терминал 1
+docker compose up -d
+
+# Терминал 2
+cd src/Client/ChatApp.Client.Blazor
+dotnet run --launch-profile http
+```
+
+> Используйте **http** профиль (`5073`), не https — иначе браузер блокирует запросы к `http://localhost:5096`.
+
+### Архитектура
+
+```
+Browser (Blazor WASM)
+    │
+    ├── AuthService / ChatService (HttpClient)
+    │
+    └── HTTP REST → localhost:5096/api/...
+```
+
+### Компоненты
+
+| Папка | Назначение |
+|-------|------------|
+| `Pages/` | `Auth.razor`, `Chat.razor` |
+| `Services/` | `AuthService`, `ChatService` |
+| `ViewModels/` | `AuthViewModel`, `ChatViewModel` |
+
+### Docker
+
+Сервис `blazor-client` в `docker-compose.yml` **закомментирован**. Blazor запускается через `dotnet run`, не через Docker.
 
 ---
 
@@ -45,7 +103,15 @@ Client/
 
 ### Program.cs
 
-**Основной поток:**
+**Выбор протокола при старте:**
+
+```
+1. HTTP (REST API)      → http://localhost:5096
+2. gRPC (Code-first)    → http://localhost:5097
+3. Message Bus (RabbitMQ) → localhost:5672
+```
+
+**Основной поток (HTTP/gRPC):**
 
 1. **Подключение к серверу**
    - Запрос URL сервера (по умолчанию: http://localhost:5096)
@@ -186,6 +252,14 @@ public class ChatPollingService
 
 ### HTTP:
 
+### Реализации IChatApiClient
+
+| Класс | Протокол | Порт |
+|-------|----------|------|
+| `HttpChatApiClient` | REST JSON | 5096 |
+| `CodeFirstGrpcChatApiClient` | gRPC code-first | 5097 |
+| `MessageBusApiClient` | RabbitMQ | 5672 |
+
 #### HttpChatApiClient : IChatApiClient
 Реализация HTTP клиента для взаимодействия с API:
 
@@ -254,7 +328,9 @@ catch (Exception ex)
 ### Зависимости:
 ```xml
 <PackageReference Include="System.Net.Http.Json" />
-<PackageReference Include="Microsoft.Extensions.Http" />
+<PackageReference Include="Grpc.Net.Client" />
+<PackageReference Include="protobuf-net.Grpc" />
+<PackageReference Include="MassTransit.RabbitMQ" />
 ```
 
 ---

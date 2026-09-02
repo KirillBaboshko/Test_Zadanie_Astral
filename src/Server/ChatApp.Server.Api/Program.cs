@@ -24,23 +24,33 @@ var rsaKey = new RsaSecurityKey(rsa);
 var builder = WebApplication.CreateBuilder(args);
 
 
-var httpPort = int.TryParse(Environment.GetEnvironmentVariable("HTTP_PORT"), out var hPort) ? hPort : 5096;
-var grpcPort = int.TryParse(Environment.GetEnvironmentVariable("GRPC_PORT"), out var gPort) ? gPort : 5097;
+var httpPort = ResolvePort("HTTP_PORT", "ASPNETCORE_HTTP_PORTS", 5096);
+var grpcPort = ResolvePort("GRPC_PORT", "ASPNETCORE_GRPC_PORTS", 5097);
 
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // HTTP/1.1 для REST API
-    options.ListenLocalhost(httpPort, listenOptions =>
+    // ListenAnyIP нужен для Docker: порт-маппинг приходит не на 127.0.0.1
+    options.ListenAnyIP(httpPort, listenOptions =>
     {
         listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1;
     });
-    
-    // HTTP/2 для gRPC без TLS
-    options.ListenLocalhost(grpcPort, listenOptions =>
+
+    options.ListenAnyIP(grpcPort, listenOptions =>
     {
         listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
     });
 });
+
+static int ResolvePort(string primaryEnvVar, string fallbackEnvVar, int defaultPort)
+{
+    if (int.TryParse(Environment.GetEnvironmentVariable(primaryEnvVar), out var primaryPort))
+        return primaryPort;
+
+    if (int.TryParse(Environment.GetEnvironmentVariable(fallbackEnvVar), out var fallbackPort))
+        return fallbackPort;
+
+    return defaultPort;
+}
 
 Console.WriteLine($"Server configured: HTTP port {httpPort}, gRPC port {grpcPort}");
 
@@ -75,39 +85,12 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddValidatorsFromAssemblyContaining<SendMessageUseCase>();
 
-// Регистрация Use Cases
-builder.Services.AddScoped<RegisterUseCase>();
-builder.Services.AddScoped<LoginUseCase>();
-builder.Services.AddScoped<GetMessagesUseCase>();
-builder.Services.AddScoped<GetUsersUseCase>();
-builder.Services.AddScoped<GetUserInfoUseCase>();
-
-// Регистрация Cross-Cutting Concerns декораторов
-builder.Services.AddScoped(typeof(ChatApp.Server.Application.Common.CrossCutting.LoggingDecorator<,>));
-builder.Services.AddScoped(typeof(ChatApp.Server.Application.Common.CrossCutting.UnitOfWorkDecorator<,>));
-
-// Регистрация SendMessage UseCase с декораторами (используется везде: REST, gRPC, Message Bus)
-builder.Services.AddScoped<ChatApp.Server.Application.Common.IUseCase<
-    ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-    ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>(sp =>
+builder.Services.AddMediatR(cfg =>
 {
-    var decorators = new List<ChatApp.Server.Application.Common.CrossCutting.IUseCaseDecorator<
-        ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-        ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>
-    {
-        // Порядок важен: сначала LoggingDecorator, потом UnitOfWorkDecorator
-        sp.GetRequiredService<ChatApp.Server.Application.Common.CrossCutting.LoggingDecorator<
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>(),
-        sp.GetRequiredService<ChatApp.Server.Application.Common.CrossCutting.UnitOfWorkDecorator<
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>()
-    };
-
-    return new ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCase(
-        sp.GetRequiredService<ChatApp.Server.Domain.Repositories.IUserRepository>(),
-        sp.GetRequiredService<ChatApp.Server.Application.Services.IOutboxService>(),
-        decorators);
+    cfg.RegisterServicesFromAssemblyContaining<ChatApp.Server.Application.Commands.SendMessage.SendMessageCommand>();
+    
+    cfg.AddOpenBehavior(typeof(ChatApp.Server.Application.Behaviors.LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ChatApp.Server.Application.Behaviors.UnitOfWorkBehavior<,>));
 });
 
 builder.Services.AddScoped<ChatApp.Server.Application.Services.IOutboxService, ChatApp.Server.Infrastructure.Services.OutboxService>();
@@ -135,7 +118,6 @@ builder.Services.AddMassTransit(x =>
             h.Password(rabbitPass);
         });
 
-        // Автоматическая настройка endpoints для consumers
         cfg.ConfigureEndpoints(context);
     });
 });
@@ -205,7 +187,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Code-first gRPC сервисы (новый подход)
 app.MapGrpcService<CodeFirstAuthService>();
 app.MapGrpcService<CodeFirstChatService>();
 

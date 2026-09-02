@@ -128,7 +128,6 @@ public class MessageBusApiClient : IChatApiClient
         _currentUserId = Guid.Empty;
         _currentUsername = string.Empty;
         
-        // Очищаем контекст пользователя
         CurrentUserContext.Instance.Clear();
     }
 

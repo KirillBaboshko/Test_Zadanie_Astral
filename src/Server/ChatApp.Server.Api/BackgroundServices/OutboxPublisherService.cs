@@ -15,9 +15,9 @@ public class OutboxPublisherService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<OutboxPublisherService> _logger;
-    private readonly TimeSpan _processingInterval = TimeSpan.FromSeconds(5); // Обработка каждые 5 секунд
-    private readonly int _batchSize = 100; // Обрабатываем до 100 событий за раз
-    private readonly int _maxRetryCount = 5; // Максимум 5 попыток публикации
+    private readonly TimeSpan _processingInterval = TimeSpan.FromSeconds(5);
+    private readonly int _batchSize = 100;
+    private readonly int _maxRetryCount = 5;
 
     public OutboxPublisherService(
         IServiceProvider serviceProvider,
@@ -57,7 +57,6 @@ public class OutboxPublisherService : BackgroundService
         var dbContext = scope.ServiceProvider.GetRequiredService<ChatDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        // Получаем необработанные сообщения
         var messages = await dbContext.OutboxMessages
             .Where(x => x.Status == OutboxMessageStatus.Pending || 
                        (x.Status == OutboxMessageStatus.Failed && x.RetryCount < _maxRetryCount))
@@ -79,7 +78,6 @@ public class OutboxPublisherService : BackgroundService
         {
             try
             {
-                // Десериализуем событие
                 var eventType = Type.GetType(message.EventType);
                 if (eventType == null)
                 {
@@ -100,10 +98,8 @@ public class OutboxPublisherService : BackgroundService
                     continue;
                 }
 
-                // Публикуем событие в RabbitMQ
                 await publishEndpoint.Publish(eventData, eventType, cancellationToken);
 
-                // Помечаем как опубликованное
                 message.Status = OutboxMessageStatus.Published;
                 message.PublishedAt = DateTime.UtcNow;
                 message.LastError = null;
@@ -130,7 +126,6 @@ public class OutboxPublisherService : BackgroundService
             }
         }
 
-        // Сохраняем изменения статусов
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (publishedCount > 0 || failedCount > 0)

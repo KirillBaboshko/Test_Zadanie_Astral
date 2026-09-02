@@ -33,7 +33,6 @@ public sealed class SendMessageUseCase : DecoratedUseCase<SendMessageUseCaseRequ
         SendMessageUseCaseRequest request,
         CancellationToken cancellationToken)
     {
-        // Находим пользователя
         var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
 
         if (user == null)
@@ -44,11 +43,9 @@ public sealed class SendMessageUseCase : DecoratedUseCase<SendMessageUseCaseRequ
             };
         }
 
-        // Добавляем сообщение
         user.UpdateLastSeen();
         var message = user.AddMessage(request.Content);
 
-        // Добавляем событие в Outbox (в той же транзакции)
         await _outboxService.AddEventAsync(new MessageSentEvent
         {
             MessageId = message.Id,

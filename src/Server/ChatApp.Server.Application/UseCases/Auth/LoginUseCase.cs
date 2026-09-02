@@ -39,10 +39,8 @@ public sealed class LoginUseCase
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
             return null; 
 
-        // Обновляем время последней активности (ChangeTracker автоматически отследит изменения)
         user.UpdateLastSeen();
 
-        // Публикуем событие входа в RabbitMQ
         await _publishEndpoint.Publish(new UserLoggedInEvent
         {
             UserId = user.Id,
@@ -50,7 +48,6 @@ public sealed class LoginUseCase
             LoggedInAt = DateTime.UtcNow
         }, cancellationToken);
 
-        // Генерируем JWT токен
         var token = _jwtTokenGenerator.GenerateToken(user.Id, user.Username);
 
         return new AuthResponse

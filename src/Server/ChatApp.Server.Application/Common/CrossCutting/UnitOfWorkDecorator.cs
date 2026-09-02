@@ -20,10 +20,8 @@ public class UnitOfWorkDecorator<TRequest, TResponse> : IUseCaseDecorator<TReque
         Func<TRequest, CancellationToken, Task<TResponse>> next,
         CancellationToken cancellationToken = default)
     {
-        // Выполняем следующий декоратор или Use Case
         var result = await next(request, cancellationToken);
 
-        // Сохраняем изменения в БД
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return result;

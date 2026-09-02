@@ -24,15 +24,13 @@ public sealed class ChatPollingService
     public async Task StartPollingAsync(String currentUserName, CancellationToken cancellationToken)
     {
         const Int32 PollingInterval = 1000;// 1 секунда
-        const Int32 InitialHistoryLimit = 10; // Показываем последние 10 сообщений при старте
+        const Int32 InitialHistoryLimit = 10;
         
-        // При старте показываем несколько последних сообщений для контекста
         try
         {
             var initialResponse = await _apiClient.GetMessagesAsync(limit: InitialHistoryLimit, cancellationToken: cancellationToken);
             if (initialResponse?.Messages != null && initialResponse.Messages.Count > 0)
             {
-                // Показываем историю сообщений (кроме своих)
                 foreach (var message in initialResponse.Messages)
                 {
                     if (!message.SenderName.Equals(currentUserName, StringComparison.OrdinalIgnoreCase))
@@ -42,13 +40,11 @@ public sealed class ChatPollingService
                     _processedMessageIds.Add(message.Id);
                 }
                 
-                // Устанавливаем время последнего сообщения
                 _lastMessageTime = initialResponse.Messages.Max(m => m.Timestamp);
             }
         }
         catch
         {
-            // Если не удалось получить историю, используем текущее время
             _lastMessageTime = DateTime.UtcNow;
         }
         
@@ -64,11 +60,9 @@ public sealed class ChatPollingService
                 {
                     foreach (var message in response.Messages)
                     {
-                        // Пропускаем уже обработанные сообщения
                         if (_processedMessageIds.Contains(message.Id))
                             continue;
                         
-                        // Не показываем свои собственные сообщения
                         if (!message.SenderName.Equals(currentUserName, StringComparison.OrdinalIgnoreCase))
                         {
                             MessageReceived?.Invoke(this, new MessageReceivedEventArgs(message));

@@ -127,7 +127,6 @@ public class AuthService
         }
         catch
         {
-            // Игнорируем ошибки при инициализации
         }
     }
 

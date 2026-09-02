@@ -25,7 +25,6 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
         };
     }
 
-    #region Authentication
 
     /// <summary>
     /// Регистрирует нового пользователя
@@ -46,7 +45,6 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
 
             var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>(cancellationToken: cancellationToken);
             
-            // Автоматически устанавливаем токен после регистрации
             if (authResponse != null)
             {
                 SetAuthToken(authResponse.Token);
@@ -80,7 +78,6 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
 
             var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>(cancellationToken: cancellationToken);
             
-            // Автоматически устанавливаем токен после авторизации
             if (authResponse != null)
             {
                 SetAuthToken(authResponse.Token);
@@ -114,9 +111,7 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
         _httpClient.DefaultRequestHeaders.Authorization = null;
     }
 
-    #endregion
 
-    #region Messages
 
     /// <summary>
     /// Отправляет новое сообщение от авторизованного пользователя
@@ -194,7 +189,6 @@ public sealed class HttpChatApiClient : IChatApiClient, IDisposable
         }
     }
 
-    #endregion
 
     public void Dispose()
     {

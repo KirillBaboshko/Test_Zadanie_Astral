@@ -47,8 +47,8 @@ public class AuthResponse
     public string Username { get; set; } = string.Empty;
 
     [DataMember(Order = 3)]
-    public long ExpiresAt { get; set; } // Unix timestamp в миллисекундах
+    public long ExpiresAt { get; set; }
 
     [DataMember(Order = 4)]
-    public string Error { get; set; } = string.Empty; // Сообщение об ошибке (если есть)
+    public string Error { get; set; } = string.Empty;
 }

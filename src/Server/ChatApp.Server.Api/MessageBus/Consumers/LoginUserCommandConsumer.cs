@@ -1,8 +1,8 @@
-using ChatApp.Contracts.Requests;
-using ChatApp.Server.Application.UseCases.Auth;
+using ChatApp.Server.Application.Commands.Auth;
 using ChatApp.Shared.Messages.Commands;
 using ChatApp.Shared.Messages.Responses;
 using MassTransit;
+using MediatR;
 
 namespace ChatApp.Server.Api.MessageBus.Consumers;
 
@@ -12,66 +12,62 @@ namespace ChatApp.Server.Api.MessageBus.Consumers;
 /// </summary>
 public class LoginUserCommandConsumer : IConsumer<LoginUserCommand>
 {
-    private readonly LoginUseCase _loginUseCase;
+    private readonly IMediator _mediator;
     private readonly ILogger<LoginUserCommandConsumer> _logger;
 
     public LoginUserCommandConsumer(
-        LoginUseCase loginUseCase,
+        IMediator mediator,
         ILogger<LoginUserCommandConsumer> logger)
     {
-        _loginUseCase = loginUseCase ?? throw new ArgumentNullException(nameof(loginUseCase));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task Consume(ConsumeContext<LoginUserCommand> context)
     {
-        var command = context.Message;
+        var rabbitCommand = context.Message;
         
         _logger.LogInformation(
             "[RabbitMQ Command Consumer] Получена команда входа: Username={Username}",
-            command.Username);
+            rabbitCommand.Username);
 
         try
         {
-            var request = new LoginRequest
-            {
-                Username = command.Username,
-                Password = command.Password
-            };
+            var command = new LoginCommand(rabbitCommand.Username, rabbitCommand.Password);
+            var response = await _mediator.Send(command, context.CancellationToken);
 
-            var authResponse = await _loginUseCase.ExecuteAsync(request, context.CancellationToken);
-
-            if (authResponse == null)
+            if (!response.Success)
             {
                 await context.RespondAsync(new LoginUserResponse
                 {
                     Success = false,
-                    ErrorMessage = "Неверное имя пользователя или пароль"
+                    ErrorMessage = response.ErrorMessage ?? "Не удалось войти в систему"
                 });
                 
                 _logger.LogWarning(
-                    "[RabbitMQ Command Consumer] Вход не удался: неверные учетные данные для {Username}",
-                    command.Username);
+                    "[RabbitMQ Command Consumer] Вход не удался: {ErrorMessage}",
+                    response.ErrorMessage);
                 return;
             }
+            
             await context.RespondAsync(new LoginUserResponse
             {
                 Success = true,
-                Token = authResponse.Token,
-                UserId = authResponse.UserId,
-                Username = authResponse.Username
+                Token = response.Token!,
+                UserId = response.UserId,
+                Username = response.Username!
             });
 
             _logger.LogInformation(
                 "[RabbitMQ Command Consumer] Вход успешен: {Username} (Id={UserId})",
-                authResponse.Username,
-                authResponse.UserId);
+                response.Username,
+                response.UserId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, 
                 "[RabbitMQ Command Consumer] Ошибка при входе пользователя {Username}",
-                command.Username);
+                rabbitCommand.Username);
 
             await context.RespondAsync(new LoginUserResponse
             {

@@ -1,13 +1,11 @@
-using ChatApp.Contracts.Requests;
-using ChatApp.Server.Application.Common;
-using ChatApp.Server.Application.UseCases.GetMessages;
-using ChatApp.Server.Application.UseCases.GetUsers;
-using ChatApp.Server.Application.UseCases.SendMessage;
+using ChatApp.Server.Application.Commands.SendMessage;
+using ChatApp.Server.Application.Queries.GetMessages;
+using ChatApp.Server.Application.Queries.GetUsers;
 using ChatApp.Shared.Grpc.Contracts;
+using MediatR;
 using Microsoft.IdentityModel.Tokens;
 using ProtoBuf.Grpc;
 using System.IdentityModel.Tokens.Jwt;
-using System.Runtime.CompilerServices;
 
 using CallContext = ProtoBuf.Grpc.CallContext;
 
@@ -18,24 +16,18 @@ namespace ChatApp.Server.Api.GrpcServices;
 /// </summary>
 public class CodeFirstChatService : IChatService
 {
-    private readonly IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> _sendMessageUseCase;
-    private readonly GetMessagesUseCase _getMessagesUseCase;
-    private readonly GetUsersUseCase _getUsersUseCase;
+    private readonly IMediator _mediator;
     private readonly RsaSecurityKey _rsaKey;
     private readonly IConfiguration _configuration;
     private readonly ILogger<CodeFirstChatService> _logger;
 
     public CodeFirstChatService(
-        IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> sendMessageUseCase,
-        GetMessagesUseCase getMessagesUseCase,
-        GetUsersUseCase getUsersUseCase,
+        IMediator mediator,
         RsaSecurityKey rsaKey,
         IConfiguration configuration,
         ILogger<CodeFirstChatService> logger)
     {
-        _sendMessageUseCase = sendMessageUseCase;
-        _getMessagesUseCase = getMessagesUseCase;
-        _getUsersUseCase = getUsersUseCase;
+        _mediator = mediator;
         _rsaKey = rsaKey;
         _configuration = configuration;
         _logger = logger;
@@ -54,15 +46,9 @@ public class CodeFirstChatService : IChatService
 
             _logger.LogInformation("{ServerInfo} gRPC SendMessage request from user: {UserId}", serverInfo, userId);
 
-            // Создаем запрос для Use Case
-            var useCaseRequest = new SendMessageUseCaseRequest
-            {
-                UserId = userId.Value,
-                Content = request.Content
-            };
+            var command = new SendMessageCommand(userId.Value, request.Content);
 
-            // Выполняем Use Case с декораторами (Logging + UnitOfWork)
-            var response = await _sendMessageUseCase.ExecuteAsync(useCaseRequest, context.CancellationToken);
+            var response = await _mediator.Send(command, context.CancellationToken);
 
             if (!response.Success)
             {
@@ -98,7 +84,8 @@ public class CodeFirstChatService : IChatService
 
             var limit = request.Limit > 0 ? request.Limit : 100;
 
-            var response = await _getMessagesUseCase.ExecuteAsync(since, limit, context.CancellationToken);
+            var query = new GetMessagesQuery(since, limit);
+            var response = await _mediator.Send(query, context.CancellationToken);
 
             var grpcResponse = new MessagesListResponse
             {
@@ -129,7 +116,8 @@ public class CodeFirstChatService : IChatService
 
             var limit = request.Limit > 0 ? request.Limit : 100;
 
-            var response = await _getMessagesUseCase.ExecuteForUsernameAsync(request.Username, limit, context.CancellationToken);
+            var query = new GetMessagesByUsernameQuery(request.Username, limit);
+            var response = await _mediator.Send(query, context.CancellationToken);
 
             if (response == null)
             {
@@ -163,7 +151,8 @@ public class CodeFirstChatService : IChatService
         {
             _logger.LogDebug("gRPC GetUsers request");
 
-            var users = await _getUsersUseCase.ExecuteAsync(context.CancellationToken);
+            var query = new GetUsersQuery();
+            var users = await _mediator.Send(query, context.CancellationToken);
 
             var grpcResponse = new UsersListResponse
             {
@@ -187,7 +176,6 @@ public class CodeFirstChatService : IChatService
         StreamMessagesRequest request,
         CallContext context = default)
     {
-        // Валидация токена
         var userId = ValidateTokenAndGetUserId(request.Token);
         if (userId == null)
         {
@@ -202,10 +190,9 @@ public class CodeFirstChatService : IChatService
 
         while (!context.CancellationToken.IsCancellationRequested)
         {
-            // Получаем новые сообщения
-            var response = await _getMessagesUseCase.ExecuteAsync(lastTimestamp, 100, context.CancellationToken);
+            var query = new GetMessagesQuery(lastTimestamp, 100);
+            var response = await _mediator.Send(query, context.CancellationToken);
 
-            // Отправляем новые сообщения клиенту
             foreach (var msg in response.Messages)
             {
                 yield return new MessageResponse
@@ -219,7 +206,6 @@ public class CodeFirstChatService : IChatService
                 lastTimestamp = msg.Timestamp;
             }
 
-            // Ждём перед следующей проверкой
             await Task.Delay(TimeSpan.FromSeconds(2), context.CancellationToken);
         }
 

@@ -41,7 +41,6 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
             .IsRequired(false)
             .HasMaxLength(2000);
         
-        // Индекс для быстрого поиска необработанных сообщений
         builder.HasIndex(x => new { x.Status, x.CreatedAt })
             .HasDatabaseName("idx_outbox_status_created");
     }

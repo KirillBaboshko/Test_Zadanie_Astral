@@ -90,3 +90,9 @@ $RECYCLE.BIN/
 *.env
 appsettings.Development.json
 secrets.json
+
+# Local Docker Compose
+docker-compose.yml
+docker-compose.*.yml
+compose.yml
+compose.*.yml

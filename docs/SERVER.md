@@ -7,7 +7,7 @@
 ```
 Server/
 ├── ChatApp.Server.Api/              # Web API слой
-├── ChatApp.Server.Application/      # Бизнес-логика (Use Cases)
+├── ChatApp.Server.Application/      # Бизнес-логика
 ├── ChatApp.Server.Domain/           # Доменная модель
 └── ChatApp.Server.Infrastructure/   # Инфраструктура
 ```
@@ -33,6 +33,40 @@ Server/
   - `GET /api/chat/users` - Список пользователей
   - `GET /api/chat/about-user/{username}` - Информация о пользователе
 
+#### Program.cs
+Конфигурация приложения:
+- **Kestrel** — два порта: HTTP/1.1 (REST) и HTTP/2 (gRPC)
+- Регистрация сервисов (DI), JWT, Swagger, CORS
+- MediatR + MassTransit (RabbitMQ)
+- Миграции БД при старте
+- Background services (`MessageCleanupService`, `OutboxPublisherService`)
+
+**Порты (локально):**
+
+| Переменная | По умолчанию | Протокол |
+|------------|--------------|----------|
+| `HTTP_PORT` | 5096 | HTTP/1.1 — REST API |
+| `GRPC_PORT` | 5097 | HTTP/2 — gRPC |
+
+**Порты (Docker):**
+
+| Хост | Контейнер | Переменная |
+|------|-----------|------------|
+| 5096 | 8080 | `HTTP_PORT=8080` |
+| 5097 | 8081 | `GRPC_PORT=8081` |
+
+Kestrel использует `ListenAnyIP` (не `ListenLocalhost`) — обязательно для работы Docker port mapping.
+
+#### gRPC Services (Code-first)
+- **CodeFirstAuthService** — `IAuthService` (Register, Login)
+- **CodeFirstChatService** — `IChatService` (SendMessage, GetMessages, StreamMessages, …)
+
+gRPC-сервисы вызывают те же MediatR-команды, что и REST-контроллеры.
+
+#### Message Bus Consumers
+- **RegisterUserCommandConsumer**, **LoginUserCommandConsumer**, **SendMessageCommandConsumer**
+- **UserRegisteredConsumer**, **UserLoggedInConsumer**, **MessageSentConsumer**
+
 #### Background Services
 - **MessageCleanupService** - Фоновая очистка сообщений
   - Интервал проверки: каждую минуту
@@ -40,19 +74,13 @@ Server/
   - Ограничение: максимум 10,000 сообщений
   - Использует `ExecuteDeleteAsync` для эффективности
 
-#### Program.cs
-Конфигурация приложения:
-- Регистрация сервисов (DI)
-- Настройка JWT аутентификации
-- Подключение Swagger
-- CORS политики
-- Миграции базы данных при запуске
-- Background services
-
 ### Зависимости:
 ```xml
 <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
 <PackageReference Include="Swashbuckle.AspNetCore" />
+<PackageReference Include="Grpc.AspNetCore" />
+<PackageReference Include="protobuf-net.Grpc.AspNetCore" />
+<PackageReference Include="MassTransit.RabbitMQ" />
 <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
 ```
 
@@ -60,9 +88,30 @@ Server/
 
 ## 💼 ChatApp.Server.Application
 
-**Назначение:** Application слой - бизнес-логика, use cases, валидация.
+**Назначение:** Application слой - бизнес-логика, Commands, Queries, Handlers.
 
-### Use Cases (CQRS паттерн):
+### Архитектура MediatR
+
+Приложение использует паттерн медиатор через библиотеку MediatR:
+
+```
+Request → IMediator → Pipeline Behaviors → Handler → Response
+```
+
+**Подробнее:** См. [MEDIATR.md](MEDIATR.md)
+
+### Commands (Команды для изменения состояния)
+
+#### SendMessageCommand
+- **Handler:** `SendMessageCommandHandler`
+- **Что делает:**
+  - Находит пользователя по ID
+  - Добавляет сообщение через доменную модель
+  - Публикует событие в Outbox (MessageSentEvent)
+  - Возвращает данные сообщения
+- **Behaviors:** Logging → UnitOfWork → Handler
+
+### Use Cases (Legacy, постепенно мигрируют на MediatR)
 
 #### Auth (Аутентификация)
 - **RegisterUseCase** - Регистрация нового пользователя
@@ -77,25 +126,37 @@ Server/
   - Обновление `last_login`
   - Генерация JWT токена
 
-#### SendMessage
-- **SendMessageUseCase** - Отправка сообщения
-  - Поиск пользователя по ID
-  - Создание сообщения через Aggregate Root
-  - Сохранение через Unit of Work
-
-#### GetMessages
+#### Chat (Queries для чтения данных)
 - **GetMessagesUseCase** - Получение сообщений
   - `ExecuteAsync` - все сообщения с фильтром по дате
   - `ExecuteForUserIdAsync` - сообщения конкретного пользователя (по ID)
   - `ExecuteForUsernameAsync` - сообщения по имени пользователя
 
-#### GetUsers
 - **GetUsersUseCase** - Получение списка всех пользователей
 
-#### GetUserInfo
 - **GetUserInfoUseCase** - Детальная информация о пользователе
   - Username, дата регистрации, последний вход
   - Количество отправленных сообщений
+
+### Pipeline Behaviors (Cross-Cutting Concerns)
+
+**Расположение:** `Application/Behaviors/`
+
+- **LoggingBehavior** - Автоматическое логирование
+  - Логирует начало выполнения запроса с параметрами
+  - Измеряет время выполнения
+  - Логирует успешное завершение или ошибку
+
+- **UnitOfWorkBehavior** - Управление транзакциями
+  - Автоматически сохраняет изменения в БД после Handler
+  - Гарантирует транзакционность операций
+  - Работает с Outbox Pattern для надежной доставки событий
+
+### Services
+
+- **IOutboxService / OutboxService** - Outbox Pattern
+  - Сохранение событий в outbox_messages в той же транзакции
+  - Гарантия надежной доставки событий в RabbitMQ
 
 ### Validation (FluentValidation):
 - **RegisterRequestValidator** - Валидация регистрации
@@ -108,15 +169,11 @@ Server/
 - **SendMessageAuthRequestValidator** - Валидация сообщения
   - Content: 1-5000 символов
 
-### Common:
-- **UseCaseBase** - Базовый класс для Use Cases
-  - `ExecuteWithUnitOfWorkAsync` - Автоматический вызов `SaveChangesAsync`
-  - Cross-cutting concern для транзакций
-
 ### Зависимости:
 ```xml
 <PackageReference Include="FluentValidation" />
 <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+<PackageReference Include="MediatR" Version="14.2.0" />
 ```
 
 ---
@@ -458,7 +515,21 @@ API будет доступен на: http://localhost:5096
 ### Через Docker:
 
 ```bash
-docker-compose up -d
+docker compose up -d
+```
+
+API: http://localhost:5096 (REST), localhost:5097 (gRPC)
+
+**Сервисы:** `postgres`, `rabbitmq`, `server`. Blazor (`blazor-client`) в compose закомментирован.
+
+**Порты:** хост `5096 → 8080` (REST), `5097 → 8081` (gRPC). Переменные `HTTP_PORT=8080`, `GRPC_PORT=8081`.
+
+**Полезные команды:**
+```bash
+docker compose down
+docker compose logs -f server
+docker compose up -d --build server
+docker exec -it chatapp-postgres psql -U postgres -d chatapp
 ```
 
 ---
@@ -495,7 +566,21 @@ docker-compose up -d
 
 ## 🧪 Тестирование
 
-### API тесты:
+### Unit-тесты
+
+Проекты: `ChatApp.Server.Domain.Tests`, `ChatApp.Server.Application.Tests`, `ChatApp.Server.Infrastructure.Tests`.
+
+**Стек:** NUnit, NUnit3TestAdapter, NSubstitute, coverlet.collector, Microsoft.NET.Test.Sdk.
+
+```bash
+dotnet test ChatApp.slnx
+dotnet test src/Server/ChatApp.Server.Application.Tests
+dotnet test ChatApp.slnx --collect:"XPlat Code Coverage" --results-directory ./TestResults
+```
+
+Тесты используют паттерн **AAA** (Arrange, Act, Assert) и `[TestCase]` для параметризации.
+
+### API тесты (ручные):
 
 ```bash
 # Регистрация

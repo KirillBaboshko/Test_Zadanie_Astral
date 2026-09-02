@@ -1,52 +1,46 @@
-using ChatApp.Server.Application.Common;
-using ChatApp.Server.Application.UseCases.SendMessage;
-using ChatApp.Shared.Messages.Commands;
 using MassTransit;
+using MediatR;
 
 namespace ChatApp.Server.Api.MessageBus.Consumers;
 
 /// <summary>
 /// Consumer для обработки команды отправки сообщения
-/// Использует декорированный Use Case с Cross-Cutting Concerns
+/// Использует MediatR для отправки команд с автоматическим применением Behaviors
 /// </summary>
-public class SendMessageCommandConsumer : IConsumer<SendMessageCommand>
+public class SendMessageCommandConsumer : IConsumer<ChatApp.Shared.Messages.Commands.SendMessageCommand>
 {
-    private readonly IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> _sendMessageUseCase;
+    private readonly IMediator _mediator;
     private readonly ILogger<SendMessageCommandConsumer> _logger;
 
     public SendMessageCommandConsumer(
-        IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> sendMessageUseCase,
+        IMediator mediator,
         ILogger<SendMessageCommandConsumer> logger)
     {
-        _sendMessageUseCase = sendMessageUseCase ?? throw new ArgumentNullException(nameof(sendMessageUseCase));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task Consume(ConsumeContext<SendMessageCommand> context)
+    public async Task Consume(ConsumeContext<ChatApp.Shared.Messages.Commands.SendMessageCommand> context)
     {
-        var command = context.Message;
+        var rabbitCommand = context.Message;
         
         _logger.LogInformation(
             "[RabbitMQ Consumer] Получена команда SendMessage от {Username}",
-            command.Username);
+            rabbitCommand.Username);
 
         try
         {
-            var request = new SendMessageUseCaseRequest
-            {
-                UserId = command.UserId,
-                Content = command.Content
-            };
+            var command = new ChatApp.Server.Application.Commands.SendMessage.SendMessageCommand(
+                rabbitCommand.UserId,
+                rabbitCommand.Content);
 
-            // Вызываем декорированный Use Case
-            // Автоматически применяются: Logging -> UnitOfWork -> Core Logic
-            var response = await _sendMessageUseCase.ExecuteAsync(request, context.CancellationToken);
+            var response = await _mediator.Send(command, context.CancellationToken);
 
             if (!response.Success)
             {
                 _logger.LogWarning(
                     "[RabbitMQ Consumer] Пользователь {UserId} не найден",
-                    command.UserId);
+                    rabbitCommand.UserId);
                 return;
             }
 
@@ -58,7 +52,7 @@ public class SendMessageCommandConsumer : IConsumer<SendMessageCommand>
         {
             _logger.LogError(ex, 
                 "[RabbitMQ Consumer] Ошибка при обработке команды от {Username}",
-                command.Username);
+                rabbitCommand.Username);
         }
     }
 }

@@ -25,19 +25,17 @@ public class CodeFirstGrpcChatApiClient : IChatApiClient
         
         var channelOptions = new GrpcChannelOptions
         {
-            // HTTP/2 keep-alive для поддержания соединения
             HttpHandler = new SocketsHttpHandler
             {
                 PooledConnectionIdleTimeout = Timeout.InfiniteTimeSpan,
                 KeepAlivePingDelay = TimeSpan.FromSeconds(delay),
                 KeepAlivePingTimeout = TimeSpan.FromSeconds(timeout),
-                EnableMultipleHttp2Connections = true // Для пулинга коннектов к репликам
+                EnableMultipleHttp2Connections = true
             }
         };
 
         _channel = GrpcChannel.ForAddress(baseUrl, channelOptions);
         
-        // Code-first клиенты создаются через ProtoBuf.Grpc
         _authClient = _channel.CreateGrpcService<IAuthService>();
         _chatClient = _channel.CreateGrpcService<IChatService>();
     }
