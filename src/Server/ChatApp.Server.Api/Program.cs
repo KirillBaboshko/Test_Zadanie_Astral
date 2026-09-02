@@ -75,39 +75,14 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddValidatorsFromAssemblyContaining<SendMessageUseCase>();
 
-// Регистрация Use Cases
-builder.Services.AddScoped<RegisterUseCase>();
-builder.Services.AddScoped<LoginUseCase>();
-builder.Services.AddScoped<GetMessagesUseCase>();
-builder.Services.AddScoped<GetUsersUseCase>();
-builder.Services.AddScoped<GetUserInfoUseCase>();
-
-// Регистрация Cross-Cutting Concerns декораторов
-builder.Services.AddScoped(typeof(ChatApp.Server.Application.Common.CrossCutting.LoggingDecorator<,>));
-builder.Services.AddScoped(typeof(ChatApp.Server.Application.Common.CrossCutting.UnitOfWorkDecorator<,>));
-
-// Регистрация SendMessage UseCase с декораторами (используется везде: REST, gRPC, Message Bus)
-builder.Services.AddScoped<ChatApp.Server.Application.Common.IUseCase<
-    ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-    ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>(sp =>
+// Регистрация MediatR с Handlers и Behaviors из Application сборки
+builder.Services.AddMediatR(cfg =>
 {
-    var decorators = new List<ChatApp.Server.Application.Common.CrossCutting.IUseCaseDecorator<
-        ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-        ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>
-    {
-        // Порядок важен: сначала LoggingDecorator, потом UnitOfWorkDecorator
-        sp.GetRequiredService<ChatApp.Server.Application.Common.CrossCutting.LoggingDecorator<
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>(),
-        sp.GetRequiredService<ChatApp.Server.Application.Common.CrossCutting.UnitOfWorkDecorator<
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseRequest,
-            ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCaseResponse>>()
-    };
-
-    return new ChatApp.Server.Application.UseCases.SendMessage.SendMessageUseCase(
-        sp.GetRequiredService<ChatApp.Server.Domain.Repositories.IUserRepository>(),
-        sp.GetRequiredService<ChatApp.Server.Application.Services.IOutboxService>(),
-        decorators);
+    cfg.RegisterServicesFromAssemblyContaining<ChatApp.Server.Application.Commands.SendMessage.SendMessageCommand>();
+    
+    // Регистрация Behaviors (порядок важен: Logging -> UnitOfWork -> Handler)
+    cfg.AddOpenBehavior(typeof(ChatApp.Server.Application.Behaviors.LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ChatApp.Server.Application.Behaviors.UnitOfWorkBehavior<,>));
 });
 
 builder.Services.AddScoped<ChatApp.Server.Application.Services.IOutboxService, ChatApp.Server.Infrastructure.Services.OutboxService>();

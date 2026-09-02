@@ -7,7 +7,7 @@
 ```
 Server/
 ├── ChatApp.Server.Api/              # Web API слой
-├── ChatApp.Server.Application/      # Бизнес-логика (Use Cases)
+├── ChatApp.Server.Application/      # Бизнес-логика
 ├── ChatApp.Server.Domain/           # Доменная модель
 └── ChatApp.Server.Infrastructure/   # Инфраструктура
 ```
@@ -60,9 +60,30 @@ Server/
 
 ## 💼 ChatApp.Server.Application
 
-**Назначение:** Application слой - бизнес-логика, use cases, валидация.
+**Назначение:** Application слой - бизнес-логика, Commands, Queries, Handlers.
 
-### Use Cases (CQRS паттерн):
+### Архитектура MediatR
+
+Приложение использует паттерн медиатор через библиотеку MediatR:
+
+```
+Request → IMediator → Pipeline Behaviors → Handler → Response
+```
+
+**Подробнее:** См. [MEDIATR.md](MEDIATR.md)
+
+### Commands (Команды для изменения состояния)
+
+#### SendMessageCommand
+- **Handler:** `SendMessageCommandHandler`
+- **Что делает:**
+  - Находит пользователя по ID
+  - Добавляет сообщение через доменную модель
+  - Публикует событие в Outbox (MessageSentEvent)
+  - Возвращает данные сообщения
+- **Behaviors:** Logging → UnitOfWork → Handler
+
+### Use Cases (Legacy, постепенно мигрируют на MediatR)
 
 #### Auth (Аутентификация)
 - **RegisterUseCase** - Регистрация нового пользователя
@@ -77,25 +98,37 @@ Server/
   - Обновление `last_login`
   - Генерация JWT токена
 
-#### SendMessage
-- **SendMessageUseCase** - Отправка сообщения
-  - Поиск пользователя по ID
-  - Создание сообщения через Aggregate Root
-  - Сохранение через Unit of Work
-
-#### GetMessages
+#### Chat (Queries для чтения данных)
 - **GetMessagesUseCase** - Получение сообщений
   - `ExecuteAsync` - все сообщения с фильтром по дате
   - `ExecuteForUserIdAsync` - сообщения конкретного пользователя (по ID)
   - `ExecuteForUsernameAsync` - сообщения по имени пользователя
 
-#### GetUsers
 - **GetUsersUseCase** - Получение списка всех пользователей
 
-#### GetUserInfo
 - **GetUserInfoUseCase** - Детальная информация о пользователе
   - Username, дата регистрации, последний вход
   - Количество отправленных сообщений
+
+### Pipeline Behaviors (Cross-Cutting Concerns)
+
+**Расположение:** `Application/Behaviors/`
+
+- **LoggingBehavior** - Автоматическое логирование
+  - Логирует начало выполнения запроса с параметрами
+  - Измеряет время выполнения
+  - Логирует успешное завершение или ошибку
+
+- **UnitOfWorkBehavior** - Управление транзакциями
+  - Автоматически сохраняет изменения в БД после Handler
+  - Гарантирует транзакционность операций
+  - Работает с Outbox Pattern для надежной доставки событий
+
+### Services
+
+- **IOutboxService / OutboxService** - Outbox Pattern
+  - Сохранение событий в outbox_messages в той же транзакции
+  - Гарантия надежной доставки событий в RabbitMQ
 
 ### Validation (FluentValidation):
 - **RegisterRequestValidator** - Валидация регистрации
@@ -108,15 +141,11 @@ Server/
 - **SendMessageAuthRequestValidator** - Валидация сообщения
   - Content: 1-5000 символов
 
-### Common:
-- **UseCaseBase** - Базовый класс для Use Cases
-  - `ExecuteWithUnitOfWorkAsync` - Автоматический вызов `SaveChangesAsync`
-  - Cross-cutting concern для транзакций
-
 ### Зависимости:
 ```xml
 <PackageReference Include="FluentValidation" />
 <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+<PackageReference Include="MediatR" Version="14.2.0" />
 ```
 
 ---

@@ -1,7 +1,8 @@
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
-using ChatApp.Server.Application.UseCases.Auth;
+using ChatApp.Server.Application.Commands.Auth;
 using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,19 +13,16 @@ namespace ChatApp.Server.Api.Controllers;
 [Produces("application/json")]
 public class AuthController : ControllerBase
 {
-    private readonly RegisterUseCase _registerUseCase;
-    private readonly LoginUseCase _loginUseCase;
+    private readonly IMediator _mediator;
     private readonly IValidator<RegisterRequest> _registerValidator;
     private readonly IValidator<LoginRequest> _loginValidator;
 
     public AuthController(
-        RegisterUseCase registerUseCase,
-        LoginUseCase loginUseCase,
+        IMediator mediator,
         IValidator<RegisterRequest> registerValidator,
         IValidator<LoginRequest> loginValidator)
     {
-        _registerUseCase = registerUseCase ?? throw new ArgumentNullException(nameof(registerUseCase));
-        _loginUseCase = loginUseCase ?? throw new ArgumentNullException(nameof(loginUseCase));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _registerValidator = registerValidator ?? throw new ArgumentNullException(nameof(registerValidator));
         _loginValidator = loginValidator ?? throw new ArgumentNullException(nameof(loginValidator));
     }
@@ -49,12 +47,21 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var response = await _registerUseCase.ExecuteAsync(request, cancellationToken);
+        // Отправляем команду через MediatR
+        var command = new RegisterCommand(request.Username, request.Password);
+        var response = await _mediator.Send(command, cancellationToken);
 
-        if (response == null)
-            return Conflict(new { message = "Пользователь с таким именем уже существует" });
+        if (!response.Success)
+            return Conflict(new { message = response.ErrorMessage });
 
-        return CreatedAtAction(nameof(Register), response);
+        var authResponse = new AuthResponse
+        {
+            Token = response.Token!,
+            UserId = response.UserId,
+            Username = response.Username!
+        };
+
+        return CreatedAtAction(nameof(Register), authResponse);
     }
 
     [HttpPost("login")]
@@ -77,11 +84,20 @@ public class AuthController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var response = await _loginUseCase.ExecuteAsync(request, cancellationToken);
+        // Отправляем команду через MediatR
+        var command = new LoginCommand(request.Username, request.Password);
+        var response = await _mediator.Send(command, cancellationToken);
 
-        if (response == null)
-            return Unauthorized(new { message = "Неверное имя пользователя или пароль" });
+        if (!response.Success)
+            return Unauthorized(new { message = response.ErrorMessage });
 
-        return Ok(response);
+        var authResponse = new AuthResponse
+        {
+            Token = response.Token!,
+            UserId = response.UserId,
+            Username = response.Username!
+        };
+
+        return Ok(authResponse);
     }
 }

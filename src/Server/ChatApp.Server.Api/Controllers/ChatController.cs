@@ -1,14 +1,12 @@
 using ChatApp.Contracts.Messages;
 using ChatApp.Contracts.Requests;
 using ChatApp.Contracts.Responses;
-using ChatApp.Server.Application.Common;
-using ChatApp.Server.Application.UseCases.GetMessages;
-using ChatApp.Server.Application.UseCases.GetUserInfo;
-using ChatApp.Server.Application.UseCases.GetUsers;
-using ChatApp.Server.Application.UseCases.SendMessage;
-using ChatApp.Server.Application.Validation;
-using ChatApp.Server.Infrastructure.Data;
+using ChatApp.Server.Application.Commands.SendMessage;
+using ChatApp.Server.Application.Queries.GetMessages;
+using ChatApp.Server.Application.Queries.GetUserInfo;
+using ChatApp.Server.Application.Queries.GetUsers;
 using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,23 +17,14 @@ namespace ChatApp.Server.Api.Controllers;
 [Produces("application/json")]
 public class ChatController : ControllerBase
 {
-    private readonly IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> _sendMessageUseCase;
-    private readonly GetMessagesUseCase _getMessagesUseCase;
-    private readonly GetUsersUseCase _getUsersUseCase;
-    private readonly GetUserInfoUseCase _getUserInfoUseCase;
+    private readonly IMediator _mediator;
     private readonly IValidator<SendMessageAuthRequest> _sendMessageAuthValidator;
 
     public ChatController(
-        IUseCase<SendMessageUseCaseRequest, SendMessageUseCaseResponse> sendMessageUseCase,
-        GetMessagesUseCase getMessagesUseCase,
-        GetUsersUseCase getUsersUseCase,
-        GetUserInfoUseCase getUserInfoUseCase,
+        IMediator mediator,
         IValidator<SendMessageAuthRequest> sendMessageAuthValidator)
     {
-        _sendMessageUseCase = sendMessageUseCase ?? throw new ArgumentNullException(nameof(sendMessageUseCase));
-        _getMessagesUseCase = getMessagesUseCase ?? throw new ArgumentNullException(nameof(getMessagesUseCase));
-        _getUsersUseCase = getUsersUseCase ?? throw new ArgumentNullException(nameof(getUsersUseCase));
-        _getUserInfoUseCase = getUserInfoUseCase ?? throw new ArgumentNullException(nameof(getUserInfoUseCase));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _sendMessageAuthValidator = sendMessageAuthValidator ?? throw new ArgumentNullException(nameof(sendMessageAuthValidator));
     }
 
@@ -65,15 +54,11 @@ public class ChatController : ControllerBase
             return Unauthorized(new { error = "Не удалось определить пользователя из токена" });
         }
 
-        // Создаем запрос для Use Case
-        var useCaseRequest = new SendMessageUseCaseRequest
-        {
-            UserId = userId,
-            Content = request.Content
-        };
+        // Создаем команду для MediatR
+        var command = new SendMessageCommand(userId, request.Content);
 
-        // Выполняем Use Case с декораторами (Logging + UnitOfWork)
-        var response = await _sendMessageUseCase.ExecuteAsync(useCaseRequest, cancellationToken);
+        // Отправляем команду через MediatR (автоматически применяются Behaviors: Logging -> UnitOfWork)
+        var response = await _mediator.Send(command, cancellationToken);
 
         if (!response.Success)
             return NotFound(new { error = "Пользователь не найден" });
@@ -110,7 +95,8 @@ public class ChatController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var response = await _getMessagesUseCase.ExecuteAsync(since, limit, cancellationToken);
+        var query = new GetMessagesQuery(since, limit);
+        var response = await _mediator.Send(query, cancellationToken);
 
         return Ok(response);
     }
@@ -129,7 +115,8 @@ public class ChatController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var response = await _getMessagesUseCase.ExecuteForUserIdAsync(userId, limit, cancellationToken);
+        var query = new GetMessagesByUserQuery(userId, limit);
+        var response = await _mediator.Send(query, cancellationToken);
 
         return Ok(response);
     }
@@ -155,7 +142,8 @@ public class ChatController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var response = await _getMessagesUseCase.ExecuteForUsernameAsync(senderName, limit, cancellationToken);
+        var query = new GetMessagesByUsernameQuery(senderName, limit);
+        var response = await _mediator.Send(query, cancellationToken);
 
         if (response == null)
             return NotFound(new { message = $"Пользователь '{senderName}' не найден" });
@@ -167,7 +155,8 @@ public class ChatController : ControllerBase
     [ProducesResponseType(typeof(List<UserDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<UserDto>>> GetUsers(CancellationToken cancellationToken = default)
     {
-        var users = await _getUsersUseCase.ExecuteAsync(cancellationToken);
+        var query = new GetUsersQuery();
+        var users = await _mediator.Send(query, cancellationToken);
         return Ok(users);
     }
 
@@ -184,7 +173,8 @@ public class ChatController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var userInfo = await _getUserInfoUseCase.ExecuteAsync(username, cancellationToken);
+        var query = new GetUserInfoQuery(username);
+        var userInfo = await _mediator.Send(query, cancellationToken);
 
         if (userInfo == null)
             return NotFound(new { message = $"Пользователь '{username}' не найден" });

@@ -1,8 +1,8 @@
-using ChatApp.Contracts.Requests;
-using ChatApp.Server.Application.UseCases.Auth;
+using ChatApp.Server.Application.Commands.Auth;
 using ChatApp.Shared.Messages.Commands;
 using ChatApp.Shared.Messages.Responses;
 using MassTransit;
+using MediatR;
 
 namespace ChatApp.Server.Api.MessageBus.Consumers;
 
@@ -12,47 +12,42 @@ namespace ChatApp.Server.Api.MessageBus.Consumers;
 /// </summary>
 public class RegisterUserCommandConsumer : IConsumer<RegisterUserCommand>
 {
-    private readonly RegisterUseCase _registerUseCase;
+    private readonly IMediator _mediator;
     private readonly ILogger<RegisterUserCommandConsumer> _logger;
 
     public RegisterUserCommandConsumer(
-        RegisterUseCase registerUseCase,
+        IMediator mediator,
         ILogger<RegisterUserCommandConsumer> logger)
     {
-        _registerUseCase = registerUseCase ?? throw new ArgumentNullException(nameof(registerUseCase));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task Consume(ConsumeContext<RegisterUserCommand> context)
     {
-        var command = context.Message;
+        var rabbitCommand = context.Message;
         
         _logger.LogInformation(
             "[RabbitMQ Command Consumer] Получена команда регистрации: Username={Username}",
-            command.Username);
+            rabbitCommand.Username);
 
         try
         {
-            var request = new RegisterRequest
-            {
-                Username = command.Username,
-                Password = command.Password
-            };
+            var command = new RegisterCommand(rabbitCommand.Username, rabbitCommand.Password);
+            var response = await _mediator.Send(command, context.CancellationToken);
 
-            var authResponse = await _registerUseCase.ExecuteAsync(request, context.CancellationToken);
-
-            if (authResponse == null)
+            if (!response.Success)
             {
                 // Пользователь уже существует
                 await context.RespondAsync(new RegisterUserResponse
                 {
                     Success = false,
-                    ErrorMessage = "Пользователь с таким именем уже существует"
+                    ErrorMessage = response.ErrorMessage ?? "Не удалось зарегистрировать пользователя"
                 });
                 
                 _logger.LogWarning(
-                    "[RabbitMQ Command Consumer] Регистрация не удалась: пользователь {Username} уже существует",
-                    command.Username);
+                    "[RabbitMQ Command Consumer] Регистрация не удалась: {ErrorMessage}",
+                    response.ErrorMessage);
                 return;
             }
 
@@ -60,21 +55,21 @@ public class RegisterUserCommandConsumer : IConsumer<RegisterUserCommand>
             await context.RespondAsync(new RegisterUserResponse
             {
                 Success = true,
-                Token = authResponse.Token,
-                UserId = authResponse.UserId,
-                Username = authResponse.Username
+                Token = response.Token!,
+                UserId = response.UserId,
+                Username = response.Username!
             });
 
             _logger.LogInformation(
                 "[RabbitMQ Command Consumer] Регистрация успешна: {Username} (Id={UserId})",
-                authResponse.Username,
-                authResponse.UserId);
+                response.Username,
+                response.UserId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, 
                 "[RabbitMQ Command Consumer] Ошибка при регистрации пользователя {Username}",
-                command.Username);
+                rabbitCommand.Username);
 
             await context.RespondAsync(new RegisterUserResponse
             {

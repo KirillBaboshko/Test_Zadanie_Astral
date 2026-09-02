@@ -1,5 +1,6 @@
-using ChatApp.Server.Application.UseCases.Auth;
+using ChatApp.Server.Application.Commands.Auth;
 using ChatApp.Shared.Grpc.Contracts;
+using MediatR;
 using ProtoBuf.Grpc;
 
 namespace ChatApp.Server.Api.GrpcServices;
@@ -9,17 +10,14 @@ namespace ChatApp.Server.Api.GrpcServices;
 /// </summary>
 public class CodeFirstAuthService : IAuthService
 {
-    private readonly RegisterUseCase _registerUseCase;
-    private readonly LoginUseCase _loginUseCase;
+    private readonly IMediator _mediator;
     private readonly ILogger<CodeFirstAuthService> _logger;
 
     public CodeFirstAuthService(
-        RegisterUseCase registerUseCase,
-        LoginUseCase loginUseCase,
+        IMediator mediator,
         ILogger<CodeFirstAuthService> logger)
     {
-        _registerUseCase = registerUseCase;
-        _loginUseCase = loginUseCase;
+        _mediator = mediator;
         _logger = logger;
     }
 
@@ -30,32 +28,30 @@ public class CodeFirstAuthService : IAuthService
             var serverInfo = $"[Code-First Server]";
             _logger.LogInformation("{ServerInfo} gRPC Register request for username: {Username}", serverInfo, request.Username);
 
-            var contractRequest = new Contracts.Requests.RegisterRequest
-            {
-                Username = request.Username,
-                Password = request.Password
-            };
+            var command = new RegisterCommand(request.Username, request.Password);
+            var response = await _mediator.Send(command, context.CancellationToken);
 
-            var authResponse = await _registerUseCase.ExecuteAsync(contractRequest, context.CancellationToken);
-
-            if (authResponse == null)
+            if (!response.Success)
             {
                 return new AuthResponse
                 {
                     Token = string.Empty,
                     Username = string.Empty,
                     ExpiresAt = 0,
-                    Error = "Не удалось зарегистрировать пользователя"
+                    Error = response.ErrorMessage ?? "Не удалось зарегистрировать пользователя"
                 };
             }
 
             _logger.LogInformation("{ServerInfo} Registration successful for: {Username}", serverInfo, request.Username);
 
+            // Вычисляем ExpiresAt (токен действителен 7 дней)
+            var expiresAt = DateTime.UtcNow.AddDays(7);
+
             return new AuthResponse
             {
-                Token = authResponse.Token,
-                Username = authResponse.Username,
-                ExpiresAt = new DateTimeOffset(authResponse.ExpiresAt).ToUnixTimeMilliseconds(),
+                Token = response.Token!,
+                Username = response.Username!,
+                ExpiresAt = new DateTimeOffset(expiresAt).ToUnixTimeMilliseconds(),
                 Error = string.Empty
             };
         }
@@ -85,32 +81,30 @@ public class CodeFirstAuthService : IAuthService
             var serverInfo = $"[Code-First Server]";
             _logger.LogInformation("{ServerInfo} gRPC Login request for username: {Username}", serverInfo, request.Username);
 
-            var contractRequest = new Contracts.Requests.LoginRequest
-            {
-                Username = request.Username,
-                Password = request.Password
-            };
+            var command = new LoginCommand(request.Username, request.Password);
+            var response = await _mediator.Send(command, context.CancellationToken);
 
-            var authResponse = await _loginUseCase.ExecuteAsync(contractRequest, context.CancellationToken);
-
-            if (authResponse == null)
+            if (!response.Success)
             {
                 return new AuthResponse
                 {
                     Token = string.Empty,
                     Username = string.Empty,
                     ExpiresAt = 0,
-                    Error = "Неверное имя пользователя или пароль"
+                    Error = response.ErrorMessage ?? "Неверное имя пользователя или пароль"
                 };
             }
 
             _logger.LogInformation("{ServerInfo} Login successful for: {Username}", serverInfo, request.Username);
 
+            // Вычисляем ExpiresAt (токен действителен 7 дней)
+            var expiresAt = DateTime.UtcNow.AddDays(7);
+
             return new AuthResponse
             {
-                Token = authResponse.Token,
-                Username = authResponse.Username,
-                ExpiresAt = new DateTimeOffset(authResponse.ExpiresAt).ToUnixTimeMilliseconds(),
+                Token = response.Token!,
+                Username = response.Username!,
+                ExpiresAt = new DateTimeOffset(expiresAt).ToUnixTimeMilliseconds(),
                 Error = string.Empty
             };
         }
